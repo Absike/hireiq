@@ -1,0 +1,9 @@
+framework:
+    messenger:
+        transports:
+            async:
+                dsn: '%env(REDIS_URL)%'
+                options:
+                    stream: messages
+        routing:
+            App\Message\ProcessDocumentMessage: async

@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}HireIQ{% endblock %}</title>
+    {% block stylesheets %}
+    {% for cssFile in viteCss %}
+    <link href="{{ cssFile }}" rel="stylesheet">
+    {% endfor %}
+    {% endblock %}
+</head>
+<body>
+    {% block body %}
+    <div id="app"></div>
+    {% endblock %}
+
+    {% block javascripts %}
+    {% if viteJs %}
+    <script type="module" src="{{ viteJs }}"></script>
+    {% endif %}
+    {% endblock %}
+</body>
+</html>

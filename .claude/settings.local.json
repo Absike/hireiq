@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(head:*)",
+      "Bash(docker-compose exec:*)",
+      "Bash(echo done:*)",
+      "Bash(docker-compose restart app && sleep 3 && docker-compose exec app php bin/console asset-map:compile 2>&1)",
+      "Bash(docker-compose up -d app nginx && sleep 3 && docker-compose exec app php bin/console asset-map:compile 2>&1)",
+      "Bash(docker-compose ps:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker ps:*)",
+      "Bash(curl:*)",
+      "Bash(cd /Users/bsiko/workspace/hireiq && npm run build 2>&1)",
+      "Bash(tail:*)",
+      "Bash(cd /Users/bsiko/workspace/hireiq/app && composer show | grep -i openai 2>&1)",
+      "Bash(cd /Users/bsiko/workspace/hireiq/app && composer show | grep -i ai 2>&1)",
+      "Bash(php:*)",
+      "Bash(grep:*)",
+      "Bash(cd:*)",
+      "Bash(git rm:*)"
+    ]
+  }
+}

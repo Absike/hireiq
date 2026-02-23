@@ -1,0 +1,167 @@
+{
+  "_Badge-DGbEYMEm.js": {
+    "file": "assets/Badge-DGbEYMEm.js",
+    "name": "Badge",
+    "imports": [
+      "index.html"
+    ]
+  },
+  "_Card-CW2pUkWJ.js": {
+    "file": "assets/Card-CW2pUkWJ.js",
+    "name": "Card",
+    "imports": [
+      "index.html",
+      "_Spinner-OxILel5D.js"
+    ]
+  },
+  "_EmptyState-CL-yazsB.js": {
+    "file": "assets/EmptyState-CL-yazsB.js",
+    "name": "EmptyState",
+    "imports": [
+      "_Spinner-OxILel5D.js",
+      "index.html"
+    ]
+  },
+  "_Modal-NLUFTsID.js": {
+    "file": "assets/Modal-NLUFTsID.js",
+    "name": "Modal",
+    "imports": [
+      "index.html"
+    ]
+  },
+  "_Spinner-OxILel5D.js": {
+    "file": "assets/Spinner-OxILel5D.js",
+    "name": "Spinner",
+    "imports": [
+      "index.html"
+    ]
+  },
+  "_candidates-BkXF5WBB.js": {
+    "file": "assets/candidates-BkXF5WBB.js",
+    "name": "candidates",
+    "imports": [
+      "index.html",
+      "_Spinner-OxILel5D.js"
+    ]
+  },
+  "_conversations-86YWFsyj.js": {
+    "file": "assets/conversations-86YWFsyj.js",
+    "name": "conversations",
+    "imports": [
+      "index.html",
+      "_Spinner-OxILel5D.js"
+    ]
+  },
+  "assets/views/Analysis.vue": {
+    "file": "assets/Analysis-og2UzPuL.js",
+    "name": "Analysis",
+    "src": "assets/views/Analysis.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html",
+      "_Card-CW2pUkWJ.js",
+      "_candidates-BkXF5WBB.js",
+      "_Spinner-OxILel5D.js"
+    ]
+  },
+  "assets/views/CandidateDetail.vue": {
+    "file": "assets/CandidateDetail-Dc6fGya8.js",
+    "name": "CandidateDetail",
+    "src": "assets/views/CandidateDetail.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html",
+      "_candidates-BkXF5WBB.js",
+      "_Card-CW2pUkWJ.js",
+      "_conversations-86YWFsyj.js",
+      "_Spinner-OxILel5D.js",
+      "_Badge-DGbEYMEm.js",
+      "_Modal-NLUFTsID.js"
+    ]
+  },
+  "assets/views/Candidates.vue": {
+    "file": "assets/Candidates-B7gY4A4F.js",
+    "name": "Candidates",
+    "src": "assets/views/Candidates.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html",
+      "_candidates-BkXF5WBB.js",
+      "_Card-CW2pUkWJ.js",
+      "_Spinner-OxILel5D.js",
+      "_Badge-DGbEYMEm.js",
+      "_Modal-NLUFTsID.js",
+      "_EmptyState-CL-yazsB.js"
+    ]
+  },
+  "assets/views/Chat.vue": {
+    "file": "assets/Chat-pLWZ4t1J.js",
+    "name": "Chat",
+    "src": "assets/views/Chat.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html",
+      "_conversations-86YWFsyj.js",
+      "_candidates-BkXF5WBB.js",
+      "_Spinner-OxILel5D.js"
+    ]
+  },
+  "assets/views/Dashboard.vue": {
+    "file": "assets/Dashboard-DTxLwiVh.js",
+    "name": "Dashboard",
+    "src": "assets/views/Dashboard.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_candidates-BkXF5WBB.js",
+      "_Card-CW2pUkWJ.js",
+      "_Spinner-OxILel5D.js",
+      "_Badge-DGbEYMEm.js",
+      "index.html"
+    ]
+  },
+  "assets/views/JobDetail.vue": {
+    "file": "assets/JobDetail-zHNe5loF.js",
+    "name": "JobDetail",
+    "src": "assets/views/JobDetail.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html",
+      "_Card-CW2pUkWJ.js",
+      "_candidates-BkXF5WBB.js",
+      "_Spinner-OxILel5D.js",
+      "_Badge-DGbEYMEm.js"
+    ]
+  },
+  "assets/views/Jobs.vue": {
+    "file": "assets/Jobs-yBSzUNZV.js",
+    "name": "Jobs",
+    "src": "assets/views/Jobs.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "index.html",
+      "_Card-CW2pUkWJ.js",
+      "_Spinner-OxILel5D.js",
+      "_Badge-DGbEYMEm.js",
+      "_Modal-NLUFTsID.js",
+      "_EmptyState-CL-yazsB.js"
+    ]
+  },
+  "index.html": {
+    "file": "assets/index-BvNKqt5Z.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "dynamicImports": [
+      "assets/views/Dashboard.vue",
+      "assets/views/Candidates.vue",
+      "assets/views/CandidateDetail.vue",
+      "assets/views/Jobs.vue",
+      "assets/views/JobDetail.vue",
+      "assets/views/Analysis.vue",
+      "assets/views/Chat.vue"
+    ],
+    "css": [
+      "assets/index-ClIfb1kZ.css"
+    ]
+  }
+}
