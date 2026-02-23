@@ -1,235 +1,108 @@
 # 🧠 HireIQ — AI-Powered HR Recruitment Platform
-## Setup Guide & Project Structure
+
+AI-powered recruitment platform that helps HR teams screen candidates faster using LLMs. Upload CVs, get AI-powered rankings, chat with candidate profiles using RAG, and automate HR workflows.
+
+**Stack:** Symfony 7.4 · Vue.js 3 · TypeScript · PostgreSQL + pgvector · Groq LLM · Redis · Docker
 
 ---
 
-## ⚡ Quick Start (5 steps)
+## ⚡ Quick Start
 
-### Step 1 — Clone / create your project folder
+### Prerequisites
+- Docker + Docker Compose
+- A free [Groq API key](https://console.groq.com)
+
+### 1. Clone the repo
 ```bash
-mkdir hireiq && cd hireiq
-# Copy all Docker files here (docker-compose.yml, docker/ folder)
+git clone git@github.com:Absike/hireiq.git
+cd hireiq
 ```
 
-### Step 2 — Create your Symfony app
-```bash
-# Create the Symfony app inside an /app subfolder
-docker run --rm -v $(pwd)/app:/app composer create-project \
-  symfony/skeleton app
-
-cd app
-
-# Install all packages you need for HireIQ
-docker run --rm -v $(pwd):/app composer require \
-  symfony/orm-pack \
-  symfony/messenger \
-  symfony/validator \
-  symfony/serializer-pack \
-  nelmio/api-doc-bundle \
-  league/flysystem-bundle \
-  league/flysystem-aws-s3-v3 \
-  smalot/pdfparser \
-  guzzlehttp/guzzle \
-  predis/predis
-```
-
-### Step 3 — Configure environment
+### 2. Configure environment
 ```bash
 cp .env.example .env
-# Edit .env and add your OpenAI or Anthropic API key
 ```
 
-### Step 4 — Start Docker
+Edit `.env` and add your API key:
+```
+GROQ_API_KEY=your-groq-key-here
+GOOGLE_GEMINI_API_KEY=optional
+```
+
+### 3. Start Docker
 ```bash
 docker compose up -d
 ```
 
-### Step 5 — Run migrations
+### 4. Run migrations
 ```bash
-docker exec hireiq_app php bin/console doctrine:migrations:migrate
+docker exec hireiq_app php /var/www/app/bin/console doctrine:migrations:migrate
 ```
 
-✅ App running at: http://localhost:8080
-✅ MinIO console at: http://localhost:9001 (login: hireiq / hireiq123)
+### 5. Clear cache
+```bash
+docker exec hireiq_app php /var/www/app/bin/console cache:clear
+```
+
+✅ App → http://localhost:8080  
+✅ API → http://localhost:8080/api  
+✅ MinIO → http://localhost:9001 (hireiq / hireiq123)
 
 ---
 
-## 📁 Project Folder Structure
-
-```
-hireiq/
-├── docker-compose.yml
-├── .env.example
-├── docker/
-│   ├── php/
-│   │   └── Dockerfile
-│   ├── nginx/
-│   │   └── default.conf
-│   └── postgres/
-│       └── init.sql          ← enables pgvector
-│
-└── app/                      ← Your Symfony project lives here
-    ├── src/
-    │   ├── Controller/
-    │   │   ├── JobController.php         ← CRUD for job positions
-    │   │   ├── CandidateController.php   ← CV upload + candidate management
-    │   │   ├── AnalysisController.php    ← AI ranking + scoring
-    │   │   └── ChatController.php        ← Chat with CV (streaming)
-    │   │
-    │   ├── Entity/
-    │   │   ├── Workspace.php             ← Multi-tenant companies
-    │   │   ├── JobPosition.php           ← Open roles
-    │   │   ├── Candidate.php             ← Applicants
-    │   │   ├── Document.php              ← Uploaded files (CV, JD)
-    │   │   ├── DocumentChunk.php         ← Text chunks with embeddings (pgvector)
-    │   │   ├── Conversation.php          ← Chat sessions
-    │   │   └── Message.php               ← Chat messages
-    │   │
-    │   ├── Service/
-    │   │   ├── AI/
-    │   │   │   ├── EmbeddingService.php      ← Convert text → vector
-    │   │   │   ├── LLMService.php            ← Call OpenAI/Claude API
-    │   │   │   ├── RagService.php            ← RAG: search chunks + generate answer
-    │   │   │   ├── CandidateRankerService.php ← Score CVs against job description
-    │   │   │   └── StreamingService.php      ← Stream LLM response to client
-    │   │   │
-    │   │   ├── Document/
-    │   │   │   ├── DocumentParserService.php  ← PDF/Word → plain text
-    │   │   │   ├── ChunkingService.php        ← Split text into chunks
-    │   │   │   └── StorageService.php         ← Upload/download from MinIO
-    │   │   │
-    │   │   └── HR/
-    │   │       ├── CandidateService.php       ← Business logic for candidates
-    │   │       └── InterviewService.php       ← Generate interview questions
-    │   │
-    │   └── Message/                           ← Symfony Messenger async messages
-    │       ├── ProcessDocumentMessage.php     ← Triggered after CV upload
-    │       └── ProcessDocumentHandler.php     ← Parse → chunk → embed → store
-    │
-    ├── migrations/                            ← Doctrine DB migrations
-    └── config/
-        ├── packages/
-        │   ├── messenger.yaml               ← Queue config (Redis transport)
-        │   └── flysystem.yaml               ← MinIO/S3 config
-        └── services.yaml
-```
-
----
-
-## 🗄️ Database Schema (Doctrine Entities)
-
-### Key tables and what they do:
-
-```sql
--- Multi-tenant: each company is a workspace
-workspaces
-  id, name, slug, created_at
-
--- Open job positions
-job_positions
-  id, workspace_id, title, description, requirements, status, created_at
-
--- Candidates applying to positions
-candidates
-  id, workspace_id, job_position_id, name, email, status, ai_score, created_at
-
--- All uploaded files (CVs, job descriptions, policies)
-documents
-  id, workspace_id, candidate_id, type, filename, s3_path, status, created_at
-
--- Text chunks extracted from documents (the RAG foundation)
-document_chunks
-  id, document_id, content (TEXT), embedding (VECTOR(1536)), page_number, chunk_index
-
--- Chat sessions between HR and a document/candidate
-conversations
-  id, workspace_id, user_id, context (JSON), created_at
-
--- Individual chat messages
-messages
-  id, conversation_id, role (user/assistant), content, sources (JSON), created_at
-```
-
----
-
-## 🔄 How the CV Processing Pipeline Works
+## 🔄 CV Processing Pipeline
 
 ```
 1. HR uploads CV (PDF)
         ↓
-2. File saved to MinIO (S3)
+2. File saved to local storage
         ↓
 3. ProcessDocumentMessage pushed to Redis queue
         ↓
 4. Worker picks up the message (async)
         ↓
-5. DocumentParserService extracts text from PDF
+5. PDF parsed → plain text extracted
         ↓
-6. ChunkingService splits text into ~500 token chunks
+6. Text split into ~500 char chunks
         ↓
-7. EmbeddingService sends each chunk to OpenAI embeddings API
+7. Chunks stored in PostgreSQL + pgvector
         ↓
-8. Each chunk + its vector saved to document_chunks table (pgvector)
+8. Groq LLM extracts: name, email, skills, experience, education
         ↓
-9. Candidate status updated to "ready"
+9. Candidate status → "ready"
         ↓
-10. HR can now: chat with CV, rank candidate, generate interview questions
+10. HR can now: chat with CV, rank, generate interview questions
 ```
 
 ---
 
-## 🤖 AI Features — Module 1 Roadmap
+## 🤖 AI Features
 
 | Feature | Endpoint | AI Pattern |
 |---------|----------|------------|
-| Upload & process CV | POST /api/candidates | Async queue + embeddings |
-| Rank candidates vs job | POST /api/analysis/rank | RAG + structured output |
-| Chat with a CV | POST /api/chat/message | Streaming RAG |
-| Generate interview questions | POST /api/analysis/interview-questions | Prompt engineering |
-| Compare candidates | POST /api/analysis/compare | Multi-doc RAG |
+| Upload & process CV | `POST /api/candidates` | Async queue + LLM extraction |
+| Rank candidates vs job | `POST /api/analysis/rank` | RAG + structured output |
+| Chat with a CV | `POST /api/conversations/{id}/messages` | Conversational RAG |
+| Generate interview questions | `POST /api/analysis/interview-questions` | Prompt engineering |
+| Compare candidates | `POST /api/analysis/compare` | Multi-doc analysis |
 
 ---
 
-## 🧰 Useful Docker Commands
+## 🧰 Useful Commands
 
 ```bash
-# Start everything
-docker compose up -d
-
-# Stop everything
-docker compose down
-
-# View app logs
-docker logs hireiq_app -f
-
-# View worker logs (async CV processing)
-docker logs hireiq_worker -f
-
-# Run Symfony console commands
-docker exec hireiq_app php bin/console [command]
-
-# Run migrations
-docker exec hireiq_app php bin/console doctrine:migrations:migrate
-
-# Create a new migration after changing an Entity
-docker exec hireiq_app php bin/console doctrine:migrations:diff
-
-# Open a shell inside the app container
-docker exec -it hireiq_app bash
-
-# Connect to PostgreSQL
-docker exec -it hireiq_postgres psql -U hireiq -d hireiq
+./hireiq.sh worker:refresh    # Clear cache + restart worker + show logs
+./hireiq.sh worker:logs       # Watch worker logs live
+./hireiq.sh cache             # Clear Symfony cache
+./hireiq.sh migrate           # Run database migrations
+./hireiq.sh ps                # Show running containers
 ```
 
 ---
 
-## ✅ Next Steps After Setup
+## 🌿 Branches
 
-1. **Create the Doctrine entities** (Document, DocumentChunk with vector column)
-2. **Build the upload endpoint** — accept PDF, save to MinIO, push to queue
-3. **Build the worker handler** — parse PDF, chunk text, call embeddings API, save vectors
-4. **Build the RAG service** — vector search + LLM call
-5. **Build the ranking endpoint** — score all candidates against a job description
-6. **Build the streaming chat endpoint** — talk to any CV in real time
-
-Ready to start with Step 1 (Entities + Migrations)? Just say the word! 🚀
+| Branch | Purpose |
+|--------|---------|
+| `master` | Stable production releases |
+| `develop` | Active development |

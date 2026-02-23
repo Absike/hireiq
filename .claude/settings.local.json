@@ -17,7 +17,8 @@
       "Bash(php:*)",
       "Bash(grep:*)",
       "Bash(cd:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(git reset:*)"
     ]
   }
 }
