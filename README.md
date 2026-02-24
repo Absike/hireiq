@@ -26,7 +26,6 @@ cp .env.example .env
 Edit `.env` and add your API key:
 ```
 GROQ_API_KEY=your-groq-key-here
-GOOGLE_GEMINI_API_KEY=optional
 ```
 
 ### 3. Start Docker

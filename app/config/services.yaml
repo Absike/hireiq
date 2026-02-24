@@ -37,3 +37,7 @@ services:
     App\Controller\Api\AnalysisController:
         arguments:
             $groqKey: '%env(GROQ_API_KEY)%'
+
+    App\Controller\Api\ConversationController:
+        arguments:
+            $groqKey: '%env(GROQ_API_KEY)%'

@@ -18,7 +18,10 @@
       "Bash(grep:*)",
       "Bash(cd:*)",
       "Bash(git rm:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(cd /Users/bsiko/workspace/hireiq/app && npm run build 2>&1)",
+      "Bash(npm run:*)"
     ]
   }
 }

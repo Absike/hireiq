@@ -1,153 +1,153 @@
 {
-  "_Badge-DGbEYMEm.js": {
-    "file": "assets/Badge-DGbEYMEm.js",
+  "_Badge-D6NHITUQ.js": {
+    "file": "assets/Badge-D6NHITUQ.js",
     "name": "Badge",
     "imports": [
-      "index.html"
+      "index.html",
+      "_Spinner-CeFBeYvD.js"
     ]
   },
-  "_Card-CW2pUkWJ.js": {
-    "file": "assets/Card-CW2pUkWJ.js",
+  "_Card-CSYaH9pd.js": {
+    "file": "assets/Card-CSYaH9pd.js",
     "name": "Card",
     "imports": [
-      "index.html",
-      "_Spinner-OxILel5D.js"
-    ]
-  },
-  "_EmptyState-CL-yazsB.js": {
-    "file": "assets/EmptyState-CL-yazsB.js",
-    "name": "EmptyState",
-    "imports": [
-      "_Spinner-OxILel5D.js",
       "index.html"
     ]
   },
-  "_Modal-NLUFTsID.js": {
-    "file": "assets/Modal-NLUFTsID.js",
+  "_EmptyState-C3B5kByq.js": {
+    "file": "assets/EmptyState-C3B5kByq.js",
+    "name": "EmptyState",
+    "imports": [
+      "_Spinner-CeFBeYvD.js",
+      "index.html"
+    ]
+  },
+  "_Modal-CNg5K6QC.js": {
+    "file": "assets/Modal-CNg5K6QC.js",
     "name": "Modal",
     "imports": [
       "index.html"
     ]
   },
-  "_Spinner-OxILel5D.js": {
-    "file": "assets/Spinner-OxILel5D.js",
+  "_Spinner-CeFBeYvD.js": {
+    "file": "assets/Spinner-CeFBeYvD.js",
     "name": "Spinner",
     "imports": [
       "index.html"
     ]
   },
-  "_candidates-BkXF5WBB.js": {
-    "file": "assets/candidates-BkXF5WBB.js",
+  "_candidates-CUz2lYJp.js": {
+    "file": "assets/candidates-CUz2lYJp.js",
     "name": "candidates",
     "imports": [
       "index.html",
-      "_Spinner-OxILel5D.js"
+      "_Spinner-CeFBeYvD.js"
     ]
   },
-  "_conversations-86YWFsyj.js": {
-    "file": "assets/conversations-86YWFsyj.js",
+  "_conversations-uNrROxC6.js": {
+    "file": "assets/conversations-uNrROxC6.js",
     "name": "conversations",
     "imports": [
       "index.html",
-      "_Spinner-OxILel5D.js"
+      "_Spinner-CeFBeYvD.js"
     ]
   },
   "assets/views/Analysis.vue": {
-    "file": "assets/Analysis-og2UzPuL.js",
+    "file": "assets/Analysis-BUe298D4.js",
     "name": "Analysis",
     "src": "assets/views/Analysis.vue",
     "isDynamicEntry": true,
     "imports": [
+      "_Badge-D6NHITUQ.js",
+      "_candidates-CUz2lYJp.js",
       "index.html",
-      "_Card-CW2pUkWJ.js",
-      "_candidates-BkXF5WBB.js",
-      "_Spinner-OxILel5D.js"
+      "_Spinner-CeFBeYvD.js"
     ]
   },
   "assets/views/CandidateDetail.vue": {
-    "file": "assets/CandidateDetail-Dc6fGya8.js",
+    "file": "assets/CandidateDetail-pTHrgGKR.js",
     "name": "CandidateDetail",
     "src": "assets/views/CandidateDetail.vue",
     "isDynamicEntry": true,
     "imports": [
       "index.html",
-      "_candidates-BkXF5WBB.js",
-      "_Card-CW2pUkWJ.js",
-      "_conversations-86YWFsyj.js",
-      "_Spinner-OxILel5D.js",
-      "_Badge-DGbEYMEm.js",
-      "_Modal-NLUFTsID.js"
+      "_candidates-CUz2lYJp.js",
+      "_Badge-D6NHITUQ.js",
+      "_conversations-uNrROxC6.js",
+      "_Spinner-CeFBeYvD.js",
+      "_Card-CSYaH9pd.js",
+      "_Modal-CNg5K6QC.js"
     ]
   },
   "assets/views/Candidates.vue": {
-    "file": "assets/Candidates-B7gY4A4F.js",
+    "file": "assets/Candidates-li7_fXRq.js",
     "name": "Candidates",
     "src": "assets/views/Candidates.vue",
     "isDynamicEntry": true,
     "imports": [
       "index.html",
-      "_candidates-BkXF5WBB.js",
-      "_Card-CW2pUkWJ.js",
-      "_Spinner-OxILel5D.js",
-      "_Badge-DGbEYMEm.js",
-      "_Modal-NLUFTsID.js",
-      "_EmptyState-CL-yazsB.js"
+      "_candidates-CUz2lYJp.js",
+      "_Badge-D6NHITUQ.js",
+      "_Card-CSYaH9pd.js",
+      "_Spinner-CeFBeYvD.js",
+      "_Modal-CNg5K6QC.js",
+      "_EmptyState-C3B5kByq.js"
     ]
   },
   "assets/views/Chat.vue": {
-    "file": "assets/Chat-pLWZ4t1J.js",
+    "file": "assets/Chat-DA1olnMz.js",
     "name": "Chat",
     "src": "assets/views/Chat.vue",
     "isDynamicEntry": true,
     "imports": [
       "index.html",
-      "_conversations-86YWFsyj.js",
-      "_candidates-BkXF5WBB.js",
-      "_Spinner-OxILel5D.js"
+      "_conversations-uNrROxC6.js",
+      "_candidates-CUz2lYJp.js",
+      "_Spinner-CeFBeYvD.js"
     ]
   },
   "assets/views/Dashboard.vue": {
-    "file": "assets/Dashboard-DTxLwiVh.js",
+    "file": "assets/Dashboard-R6970XxH.js",
     "name": "Dashboard",
     "src": "assets/views/Dashboard.vue",
     "isDynamicEntry": true,
     "imports": [
-      "_candidates-BkXF5WBB.js",
-      "_Card-CW2pUkWJ.js",
-      "_Spinner-OxILel5D.js",
-      "_Badge-DGbEYMEm.js",
+      "_candidates-CUz2lYJp.js",
+      "_Badge-D6NHITUQ.js",
+      "_Card-CSYaH9pd.js",
+      "_Spinner-CeFBeYvD.js",
       "index.html"
     ]
   },
   "assets/views/JobDetail.vue": {
-    "file": "assets/JobDetail-zHNe5loF.js",
+    "file": "assets/JobDetail-CQKLjO6j.js",
     "name": "JobDetail",
     "src": "assets/views/JobDetail.vue",
     "isDynamicEntry": true,
     "imports": [
       "index.html",
-      "_Card-CW2pUkWJ.js",
-      "_candidates-BkXF5WBB.js",
-      "_Spinner-OxILel5D.js",
-      "_Badge-DGbEYMEm.js"
+      "_Badge-D6NHITUQ.js",
+      "_candidates-CUz2lYJp.js",
+      "_Card-CSYaH9pd.js",
+      "_Spinner-CeFBeYvD.js"
     ]
   },
   "assets/views/Jobs.vue": {
-    "file": "assets/Jobs-yBSzUNZV.js",
+    "file": "assets/Jobs-BRwHozGB.js",
     "name": "Jobs",
     "src": "assets/views/Jobs.vue",
     "isDynamicEntry": true,
     "imports": [
       "index.html",
-      "_Card-CW2pUkWJ.js",
-      "_Spinner-OxILel5D.js",
-      "_Badge-DGbEYMEm.js",
-      "_Modal-NLUFTsID.js",
-      "_EmptyState-CL-yazsB.js"
+      "_Badge-D6NHITUQ.js",
+      "_Card-CSYaH9pd.js",
+      "_Spinner-CeFBeYvD.js",
+      "_Modal-CNg5K6QC.js",
+      "_EmptyState-C3B5kByq.js"
     ]
   },
   "index.html": {
-    "file": "assets/index-BvNKqt5Z.js",
+    "file": "assets/index-opfMHCT9.js",
     "name": "index",
     "src": "index.html",
     "isEntry": true,
@@ -161,7 +161,7 @@
       "assets/views/Chat.vue"
     ],
     "css": [
-      "assets/index-ClIfb1kZ.css"
+      "assets/index-BOp79L_X.css"
     ]
   }
 }

@@ -37,6 +37,7 @@ class CandidateController extends AbstractController
             'status'     => $c->getStatus(),
             'ai_score'   => $c->getAiScore(),
             'ai_summary' => $c->getAiSummary(),
+            'ai_extracted_data' => $c->getAiExtractedData(),
             'created_at' => $c->getCreatedAt()->format('Y-m-d H:i:s'),
         ], $candidates));
     }
@@ -173,6 +174,33 @@ class CandidateController extends AbstractController
         return $workspace;
     }
 
+    #[Route('/{id}/status', name: 'update_status', methods: ['PATCH'])]
+    public function updateStatus(int $id, Request $request): JsonResponse
+    {
+        $candidate = $this->em->getRepository(Candidate::class)->find($id);
+
+        if (!$candidate) {
+            return $this->json(['error' => 'Candidate not found'], 404);
+        }
+
+        $data   = json_decode($request->getContent(), true);
+        $status = $data['status'] ?? null;
+
+        $allowed = ['new', 'processing', 'ready', 'shortlisted', 'rejected'];
+        if (!in_array($status, $allowed)) {
+            return $this->json(['error' => 'Invalid status. Allowed: ' . implode(', ', $allowed)], 400);
+        }
+
+        $candidate->setStatus($status);
+        $this->em->flush();
+
+        return $this->json([
+            'id'     => $candidate->getId(),
+            'status' => $candidate->getStatus(),
+            'message'=> 'Status updated successfully.',
+        ]);
+    }
+
     #[Route('/{id}/score', name: 'score', methods: ['POST'])]
     public function score(Request $request, int $id): JsonResponse
     {
@@ -211,6 +239,14 @@ class CandidateController extends AbstractController
                 'error' => 'CV not ready for scoring. Document status: ' . ($docStatus ?? 'no document'),
                 'needs_processing' => true,
             ], 400);
+        }
+
+        // If no extracted data, extract it now
+        if (!$candidate->getAiExtractedData()) {
+            $extractedData = $this->extractCandidateInfo($cvText);
+            if (!empty($extractedData)) {
+                $candidate->setAiExtractedData($extractedData);
+            }
         }
 
         // Calculate score using Groq
@@ -318,6 +354,100 @@ Return ONLY valid JSON, no explanation.',
             'score' => $result['score'] ?? null,
             'summary' => $result['summary'] ?? 'Unable to generate summary',
         ];
+    }
+
+    private function extractCandidateInfo(string $text): array
+    {
+        $response = $this->httpClient->request('POST', 'https://api.groq.com/openai/v1/chat/completions', [
+            'auth_bearer' => $this->groqKey,
+            'json' => [
+                'model' => 'llama-3.3-70b-versatile',
+                'messages' => [
+                    ['role' => 'user', 'content' => sprintf(
+                        'Extract from this CV: name, email, phone, skills (array), years_experience, education (array), languages (array). Return ONLY valid JSON like {"name": "John", "email": "john@example.com", "phone": "+1234567890", "skills": ["PHP", "JavaScript"], "years_experience": 5, "education": ["BS CS"], "languages": ["English"]}. CV text: %s',
+                        substr($text, 0, 6000)
+                    )],
+                ],
+                'temperature' => 0.1,
+            ],
+        ]);
+
+        $data = $response->toArray();
+        $content = $data['choices'][0]['message']['content'] ?? '';
+
+        // Clean JSON response - remove markdown code blocks
+        $content = preg_replace('/```json\s*/', '', $content);
+        $content = preg_replace('/```\s*$/', '', $content);
+        $content = trim($content);
+
+        $result = json_decode($content, true);
+
+        // If JSON is invalid or missing skills, try to extract all fields with regex
+        if (!$result || !isset($result['skills'])) {
+            $result = $result ?? [];
+
+            // Extract email
+            if (!isset($result['email']) && preg_match('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', $text, $matches)) {
+                $result['email'] = $matches[0];
+            }
+
+            // Extract name (first line that looks like a name)
+            if (!isset($result['name']) && preg_match('/^([A-Z][a-z]+ [A-Z][a-z]+)/m', $text, $matches)) {
+                $result['name'] = trim($matches[1]);
+            }
+
+            // Extract phone
+            if (!isset($result['phone']) && preg_match('/\+(?:\d[\d\-\s]{8,}\d)/', $text, $matches)) {
+                $result['phone'] = trim($matches[0]);
+            }
+
+            // Extract years of experience
+            if (!isset($result['years_experience'])) {
+                if (preg_match('/(\d+)\+?\s*(?:years?|yrs?)\s*(?:of)?\s*(?:experience|exp)/i', $text, $matches)) {
+                    $result['years_experience'] = (int)$matches[1];
+                } elseif (preg_match('/experience[:\s]+(\d+)/i', $text, $matches)) {
+                    $result['years_experience'] = (int)$matches[1];
+                }
+            }
+
+            // Extract skills (common programming languages and technologies)
+            if (!isset($result['skills'])) {
+                $techStack = ['PHP', 'JavaScript', 'TypeScript', 'Python', 'Java', 'C#', 'Ruby', 'Go', 'Rust', 'Swift', 'Kotlin', 'React', 'Vue', 'Angular', 'Node.js', 'Laravel', 'Django', 'Spring', '.NET', 'AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'SQL', 'MySQL', 'PostgreSQL', 'MongoDB', 'Redis', 'GraphQL', 'REST', 'API', 'Git', 'Linux', 'HTML', 'CSS'];
+                $foundSkills = [];
+                foreach ($techStack as $tech) {
+                    if (stripos($text, $tech) !== false) {
+                        $foundSkills[] = $tech;
+                    }
+                }
+                if (!empty($foundSkills)) {
+                    $result['skills'] = array_unique($foundSkills);
+                }
+            }
+
+            // Extract education
+            if (!isset($result['education'])) {
+                $education = [];
+                if (preg_match_all('/(?:Bachelor|Master|PhD|BS|MS|BA|MA|BSc|MSc)[^\.]*/i', $text, $matches)) {
+                    $education = array_slice($matches[0], 0, 3);
+                }
+                if (!empty($education)) {
+                    $result['education'] = $education;
+                }
+            }
+
+            // Extract languages
+            if (!isset($result['languages'])) {
+                $languages = [];
+                if (preg_match_all('/(?:English|French|Spanish|German|Arabic|Chinese|Japanese|Korean|Portuguese|Italian|Russian|Hindi)[^\.]*/i', $text, $matches)) {
+                    $languages = array_unique(array_map('ucfirst', array_map('strtolower', $matches[0])));
+                }
+                if (!empty($languages)) {
+                    $result['languages'] = array_slice($languages, 0, 5);
+                }
+            }
+        }
+
+        return $result ?? [];
     }
 
     private function generateSummary(string $cvText): string

@@ -30,7 +30,8 @@ export const useConversationsStore = defineStore('conversations', () => {
     error.value = null
     try {
       const response = await conversationsApi.getMessages(conversationId)
-      messages.value = response.data
+      // API returns { conversation_id, messages: [...] }
+      messages.value = response.data.messages || []
       return response.data
     } catch (e) {
       error.value = e.message || 'Failed to fetch messages'
@@ -45,8 +46,15 @@ export const useConversationsStore = defineStore('conversations', () => {
     error.value = null
     try {
       const response = await conversationsApi.sendMessage(conversationId, message)
-      messages.value.push(response.data)
-      return response.data
+      const data = response.data
+      // API returns { user_message: {...}, ai_response: {...} }
+      if (data?.user_message) {
+        messages.value.push(data.user_message)
+      }
+      if (data?.ai_response) {
+        messages.value.push(data.ai_response)
+      }
+      return data
     } catch (e) {
       error.value = e.message || 'Failed to send message'
       throw e
