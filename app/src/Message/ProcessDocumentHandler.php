@@ -105,13 +105,68 @@ class ProcessDocumentHandler
 
         $result = json_decode($content, true);
 
-        // If JSON is invalid, try to extract email with regex
-        if (!$result || !isset($result['email'])) {
-            if (preg_match('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', $text, $matches)) {
+        // If JSON is invalid, try to extract all fields with regex
+        if (!$result || !isset($result['skills'])) {
+            $result = $result ?? [];
+
+            // Extract email
+            if (!isset($result['email']) && preg_match('/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/', $text, $matches)) {
                 $result['email'] = $matches[0];
             }
-            if (preg_match('/^\s*([A-Za-z\s]+)$/m', $text, $matches) && !isset($result['name'])) {
+
+            // Extract name (first line that looks like a name)
+            if (!isset($result['name']) && preg_match('/^([A-Z][a-z]+ [A-Z][a-z]+)/m', $text, $matches)) {
                 $result['name'] = trim($matches[1]);
+            }
+
+            // Extract phone
+            if (!isset($result['phone']) && preg_match('/\+(?:\d[\d\-\s]{8,}\d)/', $text, $matches)) {
+                $result['phone'] = trim($matches[0]);
+            }
+
+            // Extract years of experience
+            if (!isset($result['years_experience'])) {
+                if (preg_match('/(\d+)\+?\s*(?:years?|yrs?)\s*(?:of)?\s*(?:experience|exp)/i', $text, $matches)) {
+                    $result['years_experience'] = (int)$matches[1];
+                } elseif (preg_match('/experience[:\s]+(\d+)/i', $text, $matches)) {
+                    $result['years_experience'] = (int)$matches[1];
+                }
+            }
+
+            // Extract skills (common programming languages and technologies)
+            if (!isset($result['skills'])) {
+                $techStack = ['PHP', 'JavaScript', 'TypeScript', 'Python', 'Java', 'C#', 'Ruby', 'Go', 'Rust', 'Swift', 'Kotlin', 'React', 'Vue', 'Angular', 'Node.js', 'Laravel', 'Django', 'Spring', '.NET', 'AWS', 'Azure', 'GCP', 'Docker', 'Kubernetes', 'SQL', 'MySQL', 'PostgreSQL', 'MongoDB', 'Redis', 'GraphQL', 'REST', 'API', 'Git', 'Linux', 'HTML', 'CSS'];
+                $foundSkills = [];
+                foreach ($techStack as $tech) {
+                    if (stripos($text, $tech) !== false) {
+                        $foundSkills[] = $tech;
+                    }
+                }
+                if (!empty($foundSkills)) {
+                    $result['skills'] = array_unique($foundSkills);
+                }
+            }
+
+            // Extract education
+            if (!isset($result['education'])) {
+                $education = [];
+                if (preg_match_all('/(?:Bachelor|Master|PhD|BS|MS|BA|MA|BSc|MSc|MSc)[^\.]*/i', $text, $matches)) {
+                    $education = array_slice($matches[0], 0, 3);
+                }
+                if (!empty($education)) {
+                    $result['education'] = $education;
+                }
+            }
+
+            // Extract languages
+            if (!isset($result['languages'])) {
+                $languages = [];
+                if (preg_match_all('/(?:English|French|Spanish|German|Arabic|Chinese|Japanese|Korean|Portuguese|Italian|Russian|Hindi)[^\.]*/i', $text, $matches)) {
+                    $languages = array_unique(array_map('ucfirst', array_map('strtolower', $matches[0])));
+                }
+                if (!empty($languages)) {
+                    $result['languages'] = array_slice($languages, 0, 5);
+                }
             }
         }
 

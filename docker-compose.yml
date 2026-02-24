@@ -16,8 +16,6 @@ services:
       S3_KEY: hireiq
       S3_SECRET: hireiq123
       S3_BUCKET: hireiq-documents
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
     depends_on:
       - postgres
       - redis

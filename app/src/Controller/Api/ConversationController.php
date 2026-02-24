@@ -11,11 +11,16 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/api/conversations', name: 'api_conversations_')]
 class ConversationController extends AbstractController
 {
-    public function __construct(private EntityManagerInterface $em) {}
+    public function __construct(
+        private EntityManagerInterface $em,
+        private HttpClientInterface $httpClient,
+        private string $groqKey,
+    ) {}
 
     #[Route('', name: 'create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
@@ -94,18 +99,17 @@ class ConversationController extends AbstractController
         $userMessage->setContent($content);
         $this->em->persist($userMessage);
 
-        // Mock AI response for now — Gemini RAG will replace this
-        $candidate   = $conversation->getCandidate();
-        $mockReply   = sprintf(
-            'I am analyzing %s\'s CV. AI-powered responses will be available once Gemini is configured. Your question was: "%s"',
-            $candidate?->getName() ?? 'the candidate',
-            $content
-        );
+        // Get candidate CV for context
+        $candidate = $conversation->getCandidate();
+        $cvText = $this->getCandidateCvText($candidate);
+
+        // Generate AI response using Grok
+        $aiReply = $this->generateAiResponse($content, $cvText, $candidate?->getName());
 
         $aiMessage = new Message();
         $aiMessage->setConversation($conversation);
         $aiMessage->setRole(Message::ROLE_ASSISTANT);
-        $aiMessage->setContent($mockReply);
+        $aiMessage->setContent($aiReply);
         $this->em->persist($aiMessage);
 
         $this->em->flush();
@@ -122,5 +126,74 @@ class ConversationController extends AbstractController
                 'content' => $aiMessage->getContent(),
             ],
         ]);
+    }
+
+    private function getCandidateCvText(?Candidate $candidate): ?string
+    {
+        if (!$candidate) return null;
+
+        foreach ($candidate->getDocuments() as $document) {
+            if ($document->getType() === 'cv' && $document->getStatus() === 'ready') {
+                $filePath = $document->getS3Path();
+                if ($filePath && file_exists($filePath)) {
+                    try {
+                        $parser = new \Smalot\PdfParser\Parser();
+                        $pdf = $parser->parseFile($filePath);
+                        return $pdf->getText();
+                    } catch (\Exception $e) {
+                        return null;
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private function generateAiResponse(string $question, ?string $cvText, ?string $candidateName): string
+    {
+        if (!$cvText) {
+            return sprintf(
+                "I don't have access to %s's CV document to answer your question. Please ensure the CV has been uploaded and processed.",
+                $candidateName ?? 'the candidate'
+            );
+        }
+
+        $systemPrompt = sprintf(
+            'You are an AI assistant that answers questions about a candidate\'s CV. Use only the information from the CV provided. Be concise and professional. If the information is not in the CV, say so clearly. CV Content: %s',
+            substr($cvText, 0, 8000)
+        );
+
+        try {
+            $response = $this->httpClient->request('POST', 'https://api.groq.com/openai/v1/chat/completions', [
+                'auth_bearer' => $this->groqKey,
+                'headers' => [
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => [
+                    'model' => 'llama-3.1-8b-instant',
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user', 'content' => $question],
+                    ],
+                    'temperature' => 0.7,
+                    'max_tokens' => 1024,
+                ],
+            ]);
+
+            $data = $response->toArray();
+            return $data['choices'][0]['message']['content'] ?? 'Failed to get response';
+        } catch (\Exception $e) {
+            $errorDetail = $e->getMessage();
+            // Try to get more details from the response
+            if (method_exists($e, 'getResponse') && $e->getResponse()) {
+                try {
+                    $errorDetail .= ' - ' . $e->getResponse()->getContent(false);
+                } catch (\Exception $e2) {}
+            }
+            return sprintf(
+                "I encountered an error while processing your question: %s",
+                $errorDetail
+            );
+        }
     }
 }

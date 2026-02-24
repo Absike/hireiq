@@ -27,6 +27,12 @@ const chatQuestion = ref('')
 const chatAnswer = ref('')
 const selectedJobId = ref(null)
 
+// Status update modals
+const showShortlistModal = ref(false)
+const showRejectModal = ref(false)
+const statusLoading = ref(false)
+const toast = ref({ show: false, message: '', type: 'success' })
+
 const extractedData = computed(() => {
   if (!candidatesStore.currentCandidate?.ai_extracted_data) return null
   return candidatesStore.currentCandidate.ai_extracted_data
@@ -36,6 +42,12 @@ const skills = computed(() => extractedData.value?.skills || [])
 const yearsExperience = computed(() => extractedData.value?.years_experience || 'N/A')
 const education = computed(() => extractedData.value?.education || [])
 const languages = computed(() => extractedData.value?.languages || [])
+
+// Computed for button visibility
+const isShortlistedOrRejected = computed(() => {
+  const status = candidatesStore.currentCandidate?.status
+  return status === 'shortlisted' || status === 'rejected'
+})
 
 const formatDate = (date) => {
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -59,6 +71,13 @@ const getScoreColor = (score) => {
   return 'bg-emerald-500'
 }
 
+const showToast = (message, type = 'success') => {
+  toast.value = { show: true, message, type }
+  setTimeout(() => {
+    toast.value.show = false
+  }, 3000)
+}
+
 const startPolling = () => {
   if (candidatesStore.currentCandidate?.status === 'processing') {
     pollInterval.value = window.setInterval(async () => {
@@ -74,6 +93,44 @@ const stopPolling = () => {
   if (pollInterval.value) {
     clearInterval(pollInterval.value)
     pollInterval.value = null
+  }
+}
+
+const handleShortlist = async () => {
+  statusLoading.value = true
+  try {
+    await candidatesStore.updateCandidateStatus(candidateId.value, 'shortlisted')
+    showShortlistModal.value = false
+    showToast('Candidate shortlisted!')
+  } catch (e) {
+    showToast('Failed to shortlist candidate', 'error')
+  } finally {
+    statusLoading.value = false
+  }
+}
+
+const handleReject = async () => {
+  statusLoading.value = true
+  try {
+    await candidatesStore.updateCandidateStatus(candidateId.value, 'rejected')
+    showRejectModal.value = false
+    showToast('Candidate rejected')
+  } catch (e) {
+    showToast('Failed to reject candidate', 'error')
+  } finally {
+    statusLoading.value = false
+  }
+}
+
+const handleRestore = async () => {
+  statusLoading.value = true
+  try {
+    await candidatesStore.updateCandidateStatus(candidateId.value, 'ready')
+    showToast('Candidate restored to ready')
+  } catch (e) {
+    showToast('Failed to restore candidate', 'error')
+  } finally {
+    statusLoading.value = false
   }
 }
 
@@ -133,6 +190,15 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-6">
+    <!-- Toast Notification -->
+    <div
+      v-if="toast.show"
+      class="fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-200"
+      :class="toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'"
+    >
+      {{ toast.message }}
+    </div>
+
     <div class="flex items-center gap-4">
       <button @click="$router.back()" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
         <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -245,12 +311,21 @@ onUnmounted(() => {
           <Card padding="md">
             <h3 class="text-lg font-semibold text-slate-900 mb-4">Actions</h3>
             <div class="space-y-3">
-              <Button variant="success" class="w-full">
-                Shortlist Candidate
-              </Button>
-              <Button variant="danger" class="w-full">
-                Reject Candidate
-              </Button>
+              <!-- Shortlist/Reject buttons - show when not already shortlisted/rejected -->
+              <template v-if="!isShortlistedOrRejected">
+                <Button variant="success" class="w-full" @click="showShortlistModal = true">
+                  Shortlist Candidate
+                </Button>
+                <Button variant="danger" class="w-full" @click="showRejectModal = true">
+                  Reject Candidate
+                </Button>
+              </template>
+              <!-- Restore button - show when shortlisted or rejected -->
+              <template v-else>
+                <Button variant="secondary" class="w-full" @click="handleRestore" :disabled="statusLoading">
+                  Restore to Ready
+                </Button>
+              </template>
               <Button variant="secondary" class="w-full" @click="generateQuestions">
                 Generate Interview Questions
               </Button>
@@ -268,6 +343,34 @@ onUnmounted(() => {
         </div>
       </div>
     </template>
+
+    <!-- Shortlist Confirmation Modal -->
+    <Modal v-model="showShortlistModal" title="Shortlist Candidate">
+      <p class="text-slate-600">
+        Are you sure you want to shortlist <strong>{{ candidatesStore.currentCandidate?.name }}</strong>?
+      </p>
+      <div class="flex justify-end gap-3 mt-6">
+        <Button variant="ghost" @click="showShortlistModal = false">Cancel</Button>
+        <Button variant="success" :disabled="statusLoading" @click="handleShortlist">
+          <Spinner v-if="statusLoading" size="sm" class="mr-2" />
+          Shortlist
+        </Button>
+      </div>
+    </Modal>
+
+    <!-- Reject Confirmation Modal -->
+    <Modal v-model="showRejectModal" title="Reject Candidate">
+      <p class="text-slate-600">
+        Are you sure you want to reject <strong>{{ candidatesStore.currentCandidate?.name }}</strong>? This cannot be undone.
+      </p>
+      <div class="flex justify-end gap-3 mt-6">
+        <Button variant="ghost" @click="showRejectModal = false">Cancel</Button>
+        <Button variant="danger" :disabled="statusLoading" @click="handleReject">
+          <Spinner v-if="statusLoading" size="sm" class="mr-2" />
+          Reject
+        </Button>
+      </div>
+    </Modal>
 
     <!-- Interview Questions Modal -->
     <Modal v-model="showQuestionsModal" title="Interview Questions">

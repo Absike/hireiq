@@ -96,6 +96,25 @@ export const useCandidatesStore = defineStore('candidates', () => {
     }
   }
 
+  async function updateCandidateStatus(id, status) {
+    try {
+      const response = await candidatesApi.updateStatus(id, status)
+      // Update in candidates list
+      const index = candidates.value.findIndex(c => c.id === id)
+      if (index !== -1) {
+        candidates.value[index].status = response.data.status
+      }
+      // Update current candidate if it's the same
+      if (currentCandidate.value && currentCandidate.value.id === id) {
+        currentCandidate.value.status = response.data.status
+      }
+      return response.data
+    } catch (e) {
+      error.value = e.message || 'Failed to update candidate status'
+      throw e
+    }
+  }
+
   return {
     candidates,
     currentCandidate,
@@ -107,5 +126,6 @@ export const useCandidatesStore = defineStore('candidates', () => {
     deleteCandidate,
     scoreCandidate,
     summarizeCandidate,
+    updateCandidateStatus,
   }
 })

@@ -13,6 +13,7 @@ export const candidatesApi = {
   summarize: (id) => api.post(`/api/candidates/${id}/summarize`),
   chat: (id, question) => api.post(`/api/candidates/${id}/chat`, { question }),
   interviewQuestions: (id, jobPositionId) => api.post(`/api/candidates/${id}/interview-questions`, { job_position_id: jobPositionId }),
+  updateStatus: (id, status) => api.patch(`/api/candidates/${id}/status`, { status }),
 }
 
 export const jobsApi = {

@@ -1,0 +1,1 @@
+import{e as d,c as n,y as r,n as s}from"./index-opfMHCT9.js";const o={__name:"Card",props:{padding:{type:String,default:"md"}},setup(e){return(a,t)=>(d(),n("div",{class:s(["bg-white rounded-lg border border-slate-200 shadow-sm",{"p-0":e.padding==="none","p-3":e.padding==="sm","p-6":e.padding==="md","p-8":e.padding==="lg"}])},[r(a.$slots,"default")],2))}};export{o as _};
