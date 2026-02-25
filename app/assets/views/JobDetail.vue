@@ -15,6 +15,7 @@ const candidatesStore = useCandidatesStore()
 const jobId = computed(() => Number(route.params.id))
 const rankingResults = ref([])
 const isRanking = ref(false)
+const rankError = ref(null)
 
 const formatDate = (date) => {
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
@@ -37,15 +38,22 @@ const getScoreColor = (score) => {
 
 const rankCandidates = async () => {
   isRanking.value = true
+  rankError.value = null
   try {
     const response = await fetch('http://localhost:8080/api/analysis/rank', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ job_id: jobId.value, candidate_ids: candidatesStore.candidates.map(c => c.id) }),
     })
-    rankingResults.value = await response.json()
+    const payload = await response.json()
+    if (!response.ok) {
+      throw new Error(payload?.error || 'Failed to rank candidates')
+    }
+    rankingResults.value = Array.isArray(payload) ? payload : (payload.ranked ?? [])
   } catch (e) {
     console.error(e)
+    rankingResults.value = []
+    rankError.value = e.message || 'Failed to rank candidates'
   } finally {
     isRanking.value = false
   }
@@ -116,11 +124,15 @@ onMounted(async () => {
               </Button>
             </div>
 
-            <div v-if="rankingResults.length === 0" class="text-center py-8 text-slate-500">
+            <div v-if="rankError" class="mb-3 bg-rose-50 border border-rose-200 rounded-lg p-3 text-rose-700 text-sm">
+              {{ rankError }}
+            </div>
+
+            <div v-if="!rankError && rankingResults.length === 0" class="text-center py-8 text-slate-500">
               Click "Rank Candidates" to see AI-powered rankings
             </div>
 
-            <div v-else class="space-y-3">
+            <div v-else-if="rankingResults.length > 0" class="space-y-3">
               <div
                 v-for="(result, index) in rankingResults"
                 :key="result.candidate_id"

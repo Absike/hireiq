@@ -63,6 +63,8 @@ class ConversationController extends AbstractController
             return $this->json(['error' => 'Conversation not found'], 404);
         }
 
+        $candidate = $conversation->getCandidate();
+
         $messages = array_map(fn(Message $m) => [
             'id'         => $m->getId(),
             'role'       => $m->getRole(),
@@ -73,6 +75,10 @@ class ConversationController extends AbstractController
 
         return $this->json([
             'conversation_id' => $id,
+            'candidate_id'    => $candidate?->getId(),
+            'candidate_name'  => $candidate?->getName(),
+            'candidate_status'=> $candidate?->getStatus(),
+            'candidate_ai_score' => $candidate?->getAiScore(),
             'messages'        => $messages,
         ]);
     }

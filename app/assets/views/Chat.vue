@@ -2,14 +2,11 @@
 import { ref, onMounted, nextTick, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useConversationsStore } from '../stores/conversations.js'
-import { useCandidatesStore } from '../stores/candidates.js'
-import Card from '../components/ui/Card.vue'
 import Button from '../components/ui/Button.vue'
 import Spinner from '../components/ui/Spinner.vue'
 
 const route = useRoute()
 const conversationsStore = useConversationsStore()
-const candidatesStore = useCandidatesStore()
 
 const conversationId = ref(Number(route.params.id))
 const messageInput = ref('')
@@ -27,10 +24,8 @@ const suggestedQuestions = [
   "What languages do they speak?",
 ]
 
-const currentCandidate = computed(() => {
-  // Find candidate from conversation if available
-  return candidatesStore.candidates[0] || null
-})
+// Get current candidate from conversations store (populated when fetching messages)
+const currentCandidate = computed(() => conversationsStore.currentConversation)
 
 const formatDate = (date) => {
   return new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
@@ -91,10 +86,7 @@ const handleKeydown = (e) => {
 
 onMounted(async () => {
   try {
-    await Promise.all([
-      conversationsStore.fetchMessages(conversationId.value),
-      candidatesStore.fetchCandidates(),
-    ])
+    await conversationsStore.fetchMessages(conversationId.value)
     scrollToBottom()
   } catch (e) {
     console.error(e)
@@ -116,28 +108,28 @@ watch(() => conversationsStore.messages.length, () => {
         <div>
           <label class="text-xs font-medium text-slate-500 uppercase">Candidate</label>
           <p class="text-slate-900 font-medium">
-            {{ currentCandidate?.name || 'Unknown' }}
+            {{ currentCandidate?.candidate_name || 'Unknown' }}
           </p>
         </div>
 
         <div>
           <label class="text-xs font-medium text-slate-500 uppercase">Status</label>
           <p class="text-slate-900 capitalize">
-            {{ currentCandidate?.status || 'N/A' }}
+            {{ currentCandidate?.candidate_status || 'N/A' }}
           </p>
         </div>
 
-        <div v-if="currentCandidate?.ai_score">
+        <div v-if="currentCandidate?.candidate_ai_score">
           <label class="text-xs font-medium text-slate-500 uppercase">AI Score</label>
           <div class="flex items-center gap-2">
             <div class="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
               <div
                 class="h-full rounded-full"
-                :class="currentCandidate.ai_score <= 40 ? 'bg-rose-500' : currentCandidate.ai_score <= 70 ? 'bg-amber-500' : 'bg-emerald-500'"
-                :style="{ width: currentCandidate.ai_score + '%' }"
+                :class="currentCandidate.candidate_ai_score <= 40 ? 'bg-rose-500' : currentCandidate.candidate_ai_score <= 70 ? 'bg-amber-500' : 'bg-emerald-500'"
+                :style="{ width: currentCandidate.candidate_ai_score + '%' }"
               />
             </div>
-            <span class="text-sm font-medium text-slate-700">{{ currentCandidate.ai_score }}</span>
+            <span class="text-sm font-medium text-slate-700">{{ currentCandidate.candidate_ai_score }}</span>
           </div>
         </div>
 

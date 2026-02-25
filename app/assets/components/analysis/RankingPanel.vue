@@ -17,6 +17,7 @@ const selectedCandidateIds = ref([])
 const rankingResults = ref([])
 const isLoading = ref(false)
 const apiPowered = ref(true)
+const error = ref(null)
 
 // Filter candidates with status 'ready' or 'shortlisted'
 const eligibleCandidates = computed(() => {
@@ -77,11 +78,16 @@ const toggleCandidate = (id) => {
 const runRanking = async () => {
   if (!selectedJobId.value || selectedCandidateIds.value.length === 0) return
   isLoading.value = true
+  error.value = null
   try {
     const response = await analysisApi.rank(selectedJobId.value, selectedCandidateIds.value)
-    rankingResults.value = response.data
+    const payload = response?.data ?? {}
+    rankingResults.value = Array.isArray(payload) ? payload : (payload.ranked ?? [])
+    apiPowered.value = payload.ai_powered !== false
   } catch (e) {
     console.error(e)
+    rankingResults.value = []
+    error.value = e?.response?.data?.error || 'Failed to rank candidates'
   } finally {
     isLoading.value = false
   }
@@ -197,6 +203,10 @@ const copySummary = (summary) => {
       >
         ⚙️ Mock Mode
       </span>
+    </div>
+
+    <div v-if="error" class="bg-rose-50 border border-rose-200 rounded-lg p-4 text-rose-700 text-sm">
+      {{ error }}
     </div>
 
     <!-- Step 4: Results -->

@@ -81,14 +81,18 @@ class CandidateController extends AbstractController
         $candidate->setStatus(Candidate::STATUS_PROCESSING);
         $this->em->persist($candidate);
 
-        // Move file to uploads dir
-        $uploadDir = '/var/www/app/var/uploads';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0777, true);
+        // Move file to project uploads dir (works in local and containerized envs)
+        $uploadDir = rtrim((string) $this->getParameter('kernel.project_dir'), '/') . '/var/uploads';
+        if (!is_dir($uploadDir) && !@mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
+            return $this->json(['error' => 'Failed to create upload directory'], 500);
         }
 
-        $filename = uniqid('cv_') . '.pdf';
-        $file->move($uploadDir, $filename);
+        $filename = uniqid('cv_', true) . '.pdf';
+        try {
+            $file->move($uploadDir, $filename);
+        } catch (\Throwable $e) {
+            return $this->json(['error' => 'Failed to move uploaded file'], 500);
+        }
         $finalPath = $uploadDir . '/' . $filename;
 
         // Create document record

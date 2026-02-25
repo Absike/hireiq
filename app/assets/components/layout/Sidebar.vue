@@ -8,7 +8,6 @@ const navItems = [
   { name: 'Candidates', path: '/candidates', icon: 'users' },
   { name: 'Jobs', path: '/jobs', icon: 'briefcase' },
   { name: 'Analysis', path: '/analysis', icon: 'cpu' },
-  { name: 'Chat', path: '/chat', icon: 'chat' },
 ]
 
 const isActive = (path) => {

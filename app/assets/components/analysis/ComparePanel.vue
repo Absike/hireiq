@@ -15,6 +15,20 @@ const comparisonData = ref(null)
 const isLoading = ref(false)
 const error = ref(null)
 
+// 10 comparison criteria with display helpers
+const comparisonCriteria = [
+  { key: 'professional_summary', label: 'Professional Summary', subtitle: 'Role focus & seniority' },
+  { key: 'technical_skills', label: 'Technical Skills', subtitle: 'Languages, frameworks, tools' },
+  { key: 'work_experience', label: 'Work Experience', subtitle: 'Years + similar projects' },
+  { key: 'achievements', label: 'Achievements', subtitle: 'Metrics, impact, improvements' },
+  { key: 'project_complexity', label: 'Project Complexity', subtitle: 'Built vs assisted' },
+  { key: 'engineering_practices', label: 'Engineering Practices', subtitle: 'Tests, CI/CD, architecture' },
+  { key: 'education', label: 'Education', subtitle: 'Degrees & certifications' },
+  { key: 'side_projects', label: 'Side Projects', subtitle: 'Portfolio, GitHub' },
+  { key: 'career_progression', label: 'Career Progression', subtitle: 'Growth & stability' },
+  { key: 'languages', label: 'Languages', subtitle: 'Spoken languages' },
+]
+
 const getStatusVariant = (status) => {
   const variants = {
     new: 'default',
@@ -22,18 +36,20 @@ const getStatusVariant = (status) => {
     ready: 'success',
     shortlisted: 'info',
     rejected: 'danger',
+    employed: 'success',
+    freelance: 'info',
+    seeking: 'warning',
   }
   return variants[status] || 'default'
 }
 
 const getScoreColor = (score) => {
-  if (score === null) return 'text-slate-400'
+  if (score === null || score === undefined) return 'text-slate-400'
   if (score <= 40) return 'text-rose-500'
   if (score <= 70) return 'text-amber-500'
   return 'text-emerald-500'
 }
 
-// Filter candidates - any status is fine for comparison
 const availableCandidates = computed(() => {
   return candidatesStore.candidates
 })
@@ -41,7 +57,6 @@ const availableCandidates = computed(() => {
 const toggleCandidate = (id) => {
   const index = selectedCandidateIds.value.indexOf(id)
   if (index === -1) {
-    // Max 3 candidates
     if (selectedCandidateIds.value.length < 3) {
       selectedCandidateIds.value.push(id)
     }
@@ -71,54 +86,140 @@ const viewProfile = (id) => {
   router.push(`/candidates/${id}`)
 }
 
-// Helper to get candidate by ID from the candidates list
+// Get candidate by ID from comparison data
 const getCandidateById = (id) => {
-  return candidatesStore.candidates.find(c => c.id === id)
+  return comparisonData.value?.candidates?.find(c => c.id === id)
 }
 
-// Helper to extract field from extracted data
-const getFieldValue = (candidateId, field) => {
+// Get extracted data with fallback
+const getExtractedData = (candidateId) => {
   const candidate = getCandidateById(candidateId)
-  if (!candidate?.ai_extracted_data) return '—'
-  return candidate.ai_extracted_data[field] || '—'
+  return candidate?.extracted || {}
 }
 
-// Determine best value for highlighting
-const getBestValue = (field, candidates) => {
-  if (field === 'ai_score') {
-    const scores = candidates.map(c => c.ai_score || 0)
-    return Math.max(...scores)
-  }
-  if (field === 'years_experience') {
-    const exps = candidates.map(c => {
-      const val = getFieldValue(c.id, 'years_experience')
-      return typeof val === 'number' ? val : parseInt(val) || 0
-    })
-    return Math.max(...exps)
-  }
-  return null
+// Get field value with safe fallback
+const getFieldValue = (candidateId, field, defaultValue = '—') => {
+  const data = getExtractedData(candidateId)
+  const value = data[field]
+  if (value === null || value === undefined || value === '') return defaultValue
+  return value
 }
 
-const isBestValue = (candidateId, field, value) => {
-  if (!comparisonData.value?.candidates) return false
-  const best = getBestValue(field, comparisonData.value.candidates)
+// Format technical skills - can be either array or object
+const formatTechnicalSkills = (candidateId) => {
+  const data = getExtractedData(candidateId)
+  const skills = data.technical_skills
+
+  if (!skills) {
+    // Fallback to plain skills array
+    const plainSkills = data.skills
+    if (!plainSkills || !Array.isArray(plainSkills)) return '—'
+    return plainSkills.slice(0, 10).join(', ')
+  }
+
+  // It's an object with categories
+  const parts = []
+  if (skills.languages?.length) parts.push(...skills.languages.slice(0, 3))
+  if (skills.frameworks?.length) parts.push(...skills.frameworks.slice(0, 3))
+  if (skills.tools?.length) parts.push(...skills.tools.slice(0, 2))
+  if (skills.platforms?.length) parts.push(...skills.platforms.slice(0, 2))
+
+  return parts.length > 0 ? parts.slice(0, 8).join(', ') : '—'
+}
+
+// Format years of experience
+const formatYearsExperience = (candidateId) => {
+  const data = getExtractedData(candidateId)
+  const years = data.years_experience
+
+  if (years === null || years === undefined) return '—'
+  return `${years} year${years !== 1 ? 's' : ''}`
+}
+
+// Format work experience as summary
+const formatWorkExperience = (candidateId) => {
+  const data = getExtractedData(candidateId)
+  const exp = data.work_experience
+
+  if (!exp || !Array.isArray(exp) || exp.length === 0) {
+    // Fallback to years
+    return formatYearsExperience(candidateId)
+  }
+
+  // Get first 2 jobs
+  const jobs = exp.slice(0, 2).map(job => {
+    const title = job.title || 'Unknown'
+    const years = job.years || ''
+    return years ? `${title} (${years}y)` : title
+  })
+
+  return jobs.join(' | ')
+}
+
+// Format achievements
+const formatAchievements = (candidateId) => {
+  const data = getExtractedData(candidateId)
+  const achievements = data.achievements
+
+  if (!achievements || !Array.isArray(achievements) || achievements.length === 0) return '—'
+  return achievements.slice(0, 3)
+}
+
+// Format education - ensure it's actual degrees, not contact info
+const formatEducation = (candidateId) => {
+  const data = getExtractedData(candidateId)
+  const education = data.education
+
+  if (!education || !Array.isArray(education) || education.length === 0) return '—'
+
+  // Filter out anything that looks like contact info
+  const validEducation = education.filter(edu => {
+    const str = String(edu)
+    return !str.includes('@') && !str.match(/^\+?\d{8,}/) && str.length > 5
+  })
+
+  return validEducation.length > 0 ? validEducation : '—'
+}
+
+// Format languages
+const formatLanguages = (candidateId) => {
+  const data = getExtractedData(candidateId)
+  const languages = data.languages
+
+  if (!languages || !Array.isArray(languages) || languages.length === 0) return '—'
+  return languages.slice(0, 5)
+}
+
+// Format side projects
+const formatSideProjects = (candidateId) => {
+  const data = getExtractedData(candidateId)
+  const projects = data.side_projects
+
+  if (!projects || !Array.isArray(projects) || projects.length === 0) return '—'
+  return projects.slice(0, 3)
+}
+
+// Determine best score for highlighting
+const getBestScore = () => {
+  if (!comparisonData.value?.candidates) return null
+  const scores = comparisonData.value.candidates
+    .map(c => c.ai_score || 0)
+    .filter(s => s > 0)
+  return scores.length > 0 ? Math.max(...scores) : null
+}
+
+const isBestScore = (candidateId) => {
+  const best = getBestScore()
   if (best === null) return false
-
-  if (field === 'ai_score') {
-    const candidate = getCandidateById(candidateId)
-    return candidate?.ai_score === best
-  }
-  if (field === 'years_experience') {
-    const val = typeof value === 'number' ? value : parseInt(value) || 0
-    return val === best
-  }
-  return false
+  const candidate = getCandidateById(candidateId)
+  return candidate?.ai_score === best
 }
 
-const formatSkills = (candidateId) => {
-  const skills = getFieldValue(candidateId, 'skills')
-  if (skills === '—' || !skills) return '—'
-  return Array.isArray(skills) ? skills : [skills]
+// Helper for rendering array content
+const renderArrayContent = (value) => {
+  if (value === '—') return '—'
+  if (Array.isArray(value)) return value
+  return [value]
 }
 </script>
 
@@ -185,103 +286,214 @@ const formatSkills = (candidateId) => {
     </div>
 
     <!-- Step 3: Comparison Results -->
-    <div v-if="comparisonData?.candidates?.length > 0" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <table class="w-full">
-        <thead>
-          <tr class="bg-slate-50">
-            <th class="text-left px-4 py-3 text-sm font-medium text-slate-500 w-40">Attribute</th>
-            <th
-              v-for="candidate in comparisonData.candidates"
-              :key="candidate.id"
-              class="text-left px-4 py-3"
-            >
-              <div class="flex flex-col">
-                <span class="font-semibold text-slate-900">{{ candidate.name }}</span>
-                <Button variant="ghost" size="sm" class="mt-1" @click="viewProfile(candidate.id)">
-                  View Profile
-                </Button>
-              </div>
-            </th>
-          </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-200">
-          <tr>
-            <td class="px-4 py-3 text-sm font-medium text-slate-500">Status</td>
-            <td v-for="candidate in comparisonData.candidates" :key="candidate.id" class="px-4 py-3">
-              <Badge :variant="getStatusVariant(candidate.status)" />
-            </td>
-          </tr>
-          <tr>
-            <td class="px-4 py-3 text-sm font-medium text-slate-500">AI Score</td>
-            <td
-              v-for="candidate in comparisonData.candidates"
-              :key="candidate.id"
-              class="px-4 py-3"
-              :class="isBestValue(candidate.id, 'ai_score', candidate.ai_score) ? 'bg-emerald-50' : ''"
-            >
-              <span class="font-bold" :class="getScoreColor(candidate.ai_score)">
-                {{ candidate.ai_score || '—' }}
-              </span>
-            </td>
-          </tr>
-          <tr>
-            <td class="px-4 py-3 text-sm font-medium text-slate-500">Experience</td>
-            <td
-              v-for="candidate in comparisonData.candidates"
-              :key="candidate.id"
-              class="px-4 py-3"
-              :class="isBestValue(candidate.id, 'years_experience', getFieldValue(candidate.id, 'years_experience')) ? 'bg-emerald-50' : ''"
-            >
-              {{ getFieldValue(candidate.id, 'years_experience') }}
-            </td>
-          </tr>
-          <tr>
-            <td class="px-4 py-3 text-sm font-medium text-slate-500">Skills</td>
-            <td v-for="candidate in comparisonData.candidates" :key="candidate.id" class="px-4 py-3">
-              <div v-if="formatSkills(candidate.id) !== '—'" class="flex flex-wrap gap-1">
+    <div v-if="comparisonData?.candidates?.length > 0" class="space-y-4">
+      <!-- Header with candidate names -->
+      <div class="bg-slate-800 text-white rounded-t-xl p-4">
+        <div class="flex">
+          <div class="w-48 flex-shrink-0"></div>
+          <div
+            v-for="candidate in comparisonData.candidates"
+            :key="candidate.id"
+            class="flex-1 text-center"
+          >
+            <div class="font-semibold text-lg">{{ candidate.name }}</div>
+            <Button variant="ghost" size="sm" class="text-indigo-300 hover:text-white mt-1" @click="viewProfile(candidate.id)">
+              View Profile
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Basic Info Row -->
+      <div class="bg-white rounded-b-xl border-x border-b border-slate-200 overflow-hidden">
+        <div class="flex">
+          <div class="w-48 flex-shrink-0 bg-slate-50 p-4 border-r border-slate-200">
+            <div class="font-medium text-slate-700">Status</div>
+            <div class="text-xs text-slate-500">Employment status</div>
+          </div>
+          <div
+            v-for="candidate in comparisonData.candidates"
+            :key="candidate.id"
+            class="flex-1 p-4 border-r border-slate-200 last:border-r-0"
+          >
+            <Badge :variant="getStatusVariant(candidate.status)" />
+          </div>
+        </div>
+
+        <div class="flex border-t border-slate-200">
+          <div class="w-48 flex-shrink-0 bg-slate-50 p-4 border-r border-slate-200">
+            <div class="font-medium text-slate-700">AI Score</div>
+            <div class="text-xs text-slate-500">Overall fit score</div>
+          </div>
+          <div
+            v-for="candidate in comparisonData.candidates"
+            :key="candidate.id"
+            class="flex-1 p-4 border-r border-slate-200 last:border-r-0"
+            :class="isBestScore(candidate.id) ? 'bg-emerald-50' : ''"
+          >
+            <span class="font-bold text-lg" :class="getScoreColor(candidate.ai_score)">
+              {{ candidate.ai_score || '—' }}
+            </span>
+          </div>
+        </div>
+
+        <div class="flex border-t border-slate-200">
+          <div class="w-48 flex-shrink-0 bg-slate-50 p-4 border-r border-slate-200">
+            <div class="font-medium text-slate-700">Experience</div>
+            <div class="text-xs text-slate-500">Total years</div>
+          </div>
+          <div
+            v-for="candidate in comparisonData.candidates"
+            :key="candidate.id"
+            class="flex-1 p-4 border-r border-slate-200 last:border-r-0"
+          >
+            {{ formatYearsExperience(candidate.id) }}
+          </div>
+        </div>
+      </div>
+
+      <!-- 10 Comparison Criteria -->
+      <div
+        v-for="(criteria, index) in comparisonCriteria"
+        :key="criteria.key"
+        class="bg-white rounded-xl border border-slate-200 overflow-hidden"
+      >
+        <div class="flex">
+          <div class="w-48 flex-shrink-0 bg-slate-50 p-4 border-r border-slate-200">
+            <div class="font-medium text-slate-700">{{ criteria.label }}</div>
+            <div class="text-xs text-slate-500">{{ criteria.subtitle }}</div>
+          </div>
+          <div
+            v-for="candidate in comparisonData.candidates"
+            :key="candidate.id"
+            class="flex-1 p-4 border-r border-slate-200 last:border-r-0"
+          >
+            <!-- Professional Summary -->
+            <template v-if="criteria.key === 'professional_summary'">
+              <p v-if="getFieldValue(candidate.id, 'professional_summary') !== '—'" class="text-sm text-slate-700">
+                {{ getFieldValue(candidate.id, 'professional_summary') }}
+              </p>
+              <span v-else class="text-slate-400">—</span>
+            </template>
+
+            <!-- Technical Skills -->
+            <template v-else-if="criteria.key === 'technical_skills'">
+              <div v-if="formatTechnicalSkills(candidate.id) !== '—'" class="flex flex-wrap gap-1">
                 <span
-                  v-for="skill in formatSkills(candidate.id)"
+                  v-for="skill in formatTechnicalSkills(candidate.id).split(', ')"
                   :key="skill"
                   class="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs"
                 >
-                  {{ skill }}
+                  {{ skill.trim() }}
                 </span>
               </div>
               <span v-else class="text-slate-400">—</span>
-            </td>
-          </tr>
-          <tr>
-            <td class="px-4 py-3 text-sm font-medium text-slate-500">Education</td>
-            <td v-for="candidate in comparisonData.candidates" :key="candidate.id" class="px-4 py-3">
-              <div v-if="getFieldValue(candidate.id, 'education') !== '—'" class="space-y-1">
+            </template>
+
+            <!-- Work Experience -->
+            <template v-else-if="criteria.key === 'work_experience'">
+              <div v-if="getFieldValue(candidate.id, 'work_experience', []).length > 0">
                 <div
-                  v-for="edu in getFieldValue(candidate.id, 'education')"
-                  :key="edu"
+                  v-for="(job, idx) in renderArrayContent(getFieldValue(candidate.id, 'work_experience')).slice(0, 3)"
+                  :key="idx"
+                  class="text-sm text-slate-700 mb-1"
+                >
+                  {{ typeof job === 'object' ? (job.title || job) : job }}
+                </div>
+              </div>
+              <span v-else class="text-slate-400">—</span>
+            </template>
+
+            <!-- Achievements -->
+            <template v-else-if="criteria.key === 'achievements'">
+              <div v-if="formatAchievements(candidate.id) !== '—'" class="space-y-1">
+                <div
+                  v-for="(achievement, idx) in formatAchievements(candidate.id)"
+                  :key="idx"
+                  class="text-sm text-slate-700 flex items-start gap-2"
+                >
+                  <span class="text-emerald-500">•</span>
+                  {{ achievement }}
+                </div>
+              </div>
+              <span v-else class="text-slate-400">—</span>
+            </template>
+
+            <!-- Project Complexity -->
+            <template v-else-if="criteria.key === 'project_complexity'">
+              <p v-if="getFieldValue(candidate.id, 'project_complexity') !== '—'" class="text-sm text-slate-700">
+                {{ getFieldValue(candidate.id, 'project_complexity') }}
+              </p>
+              <span v-else class="text-slate-400">—</span>
+            </template>
+
+            <!-- Engineering Practices -->
+            <template v-else-if="criteria.key === 'engineering_practices'">
+              <div v-if="getFieldValue(candidate.id, 'engineering_practices', []).length > 0" class="flex flex-wrap gap-1">
+                <span
+                  v-for="practice in renderArrayContent(getFieldValue(candidate.id, 'engineering_practices')).slice(0, 6)"
+                  :key="practice"
+                  class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs"
+                >
+                  {{ practice }}
+                </span>
+              </div>
+              <span v-else class="text-slate-400">—</span>
+            </template>
+
+            <!-- Education -->
+            <template v-else-if="criteria.key === 'education'">
+              <div v-if="formatEducation(candidate.id) !== '—'" class="space-y-1">
+                <div
+                  v-for="(edu, idx) in formatEducation(candidate.id)"
+                  :key="idx"
                   class="text-sm text-slate-700"
                 >
                   {{ edu }}
                 </div>
               </div>
               <span v-else class="text-slate-400">—</span>
-            </td>
-          </tr>
-          <tr>
-            <td class="px-4 py-3 text-sm font-medium text-slate-500">Languages</td>
-            <td v-for="candidate in comparisonData.candidates" :key="candidate.id" class="px-4 py-3">
-              <div v-if="getFieldValue(candidate.id, 'languages') !== '—'" class="flex flex-wrap gap-1">
+            </template>
+
+            <!-- Side Projects -->
+            <template v-else-if="criteria.key === 'side_projects'">
+              <div v-if="formatSideProjects(candidate.id) !== '—'" class="space-y-1">
+                <div
+                  v-for="(project, idx) in formatSideProjects(candidate.id)"
+                  :key="idx"
+                  class="text-sm text-slate-700 flex items-start gap-2"
+                >
+                  <span class="text-indigo-500">◆</span>
+                  {{ project }}
+                </div>
+              </div>
+              <span v-else class="text-slate-400">—</span>
+            </template>
+
+            <!-- Career Progression -->
+            <template v-else-if="criteria.key === 'career_progression'">
+              <p v-if="getFieldValue(candidate.id, 'career_progression') !== '—'" class="text-sm text-slate-700">
+                {{ getFieldValue(candidate.id, 'career_progression') }}
+              </p>
+              <span v-else class="text-slate-400">—</span>
+            </template>
+
+            <!-- Languages -->
+            <template v-else-if="criteria.key === 'languages'">
+              <div v-if="formatLanguages(candidate.id) !== '—'" class="flex flex-wrap gap-1">
                 <span
-                  v-for="lang in getFieldValue(candidate.id, 'languages')"
+                  v-for="lang in formatLanguages(candidate.id)"
                   :key="lang"
-                  class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs"
+                  class="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs"
                 >
                   {{ lang }}
                 </span>
               </div>
               <span v-else class="text-slate-400">—</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </template>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
