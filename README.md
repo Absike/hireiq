@@ -35,7 +35,7 @@ docker compose up -d
 
 ### 4. Run migrations
 ```bash
-docker exec hireiq_app php /var/www/app/bin/console doctrine:migrations:migrate
+docker exec hireiq_app php /var/www/app/bin/console doctrine:migrations:migrate --no-interaction
 ```
 
 ### 5. Clear cache
@@ -46,6 +46,38 @@ docker exec hireiq_app php /var/www/app/bin/console cache:clear
 ✅ App → http://localhost:8080  
 ✅ API → http://localhost:8080/api  
 ✅ MinIO → http://localhost:9001 (hireiq / hireiq123)
+
+---
+
+## 🐳 Docker Configuration (Current)
+
+HireIQ runs from the root `docker-compose.yml` stack.
+
+### Services
+
+- `hireiq_app` (Symfony PHP app)
+- `hireiq_nginx` (public HTTP entrypoint)
+- `hireiq_postgres` (PostgreSQL 16 + pgvector)
+- `hireiq_redis` (queue/cache backend)
+- `hireiq_worker` (Symfony Messenger consumer)
+- `hireiq_minio` (S3-compatible object storage)
+
+### Ports
+
+- App/API: `http://localhost:8080`
+- Postgres: `localhost:5432`
+- Redis: `localhost:6379`
+- MinIO API: `localhost:9000`
+- MinIO Console: `http://localhost:9001`
+
+### Notes
+
+- Use only the root compose stack (`docker compose ...` in repo root).
+- If schema errors appear (e.g. missing tables), run migrations inside `hireiq_app`:
+
+```bash
+docker exec hireiq_app php /var/www/app/bin/console doctrine:migrations:migrate --no-interaction
+```
 
 ---
 

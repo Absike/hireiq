@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { conversationsApi } from '../api/client.js'
 
 export const useConversationsStore = defineStore('conversations', () => {
   const conversations = ref([])
   const currentConversation = ref(null)
   const messages = ref([])
+  const currentCandidate = ref(null)
   const loading = ref(false)
   const error = ref(null)
 
@@ -30,9 +31,18 @@ export const useConversationsStore = defineStore('conversations', () => {
     error.value = null
     try {
       const response = await conversationsApi.getMessages(conversationId)
-      // API returns { conversation_id, messages: [...] }
-      messages.value = response.data.messages || []
-      return response.data
+      const data = response.data
+      // API returns { conversation_id, candidate_id, candidate_name, candidate_status, candidate_ai_score, messages: [...] }
+      messages.value = data.messages || []
+      // Store current conversation info with candidate data
+      currentConversation.value = {
+        id: data.conversation_id,
+        candidate_id: data.candidate_id,
+        candidate_name: data.candidate_name,
+        candidate_status: data.candidate_status,
+        candidate_ai_score: data.candidate_ai_score,
+      }
+      return data
     } catch (e) {
       error.value = e.message || 'Failed to fetch messages'
       throw e
@@ -66,6 +76,7 @@ export const useConversationsStore = defineStore('conversations', () => {
   return {
     conversations,
     currentConversation,
+    currentCandidate,
     messages,
     loading,
     error,
