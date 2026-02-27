@@ -2,6 +2,7 @@
 import { ref, onMounted, nextTick, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useConversationsStore } from '../stores/conversations.js'
+import { candidatesApi } from '../api/client.js'
 import Button from '../components/ui/Button.vue'
 import Spinner from '../components/ui/Spinner.vue'
 
@@ -14,7 +15,7 @@ const messagesContainer = ref(null)
 const isSending = ref(false)
 const isTyping = ref(false)
 const textareaRef = ref(null)
-const apiPowered = ref(true)
+const candidateProfile = ref(null)
 
 // Suggested questions for empty chat
 const suggestedQuestions = [
@@ -87,6 +88,11 @@ const handleKeydown = (e) => {
 onMounted(async () => {
   try {
     await conversationsStore.fetchMessages(conversationId.value)
+    const candidateId = conversationsStore.currentConversation?.candidate_id
+    if (candidateId) {
+      const response = await candidatesApi.get(candidateId)
+      candidateProfile.value = response.data
+    }
     scrollToBottom()
   } catch (e) {
     console.error(e)
@@ -99,9 +105,9 @@ watch(() => conversationsStore.messages.length, () => {
 </script>
 
 <template>
-  <div class="flex h-[calc(100vh-8rem)]">
+  <div class="flex h-[calc(100vh-11rem)] md:h-[calc(100vh-8rem)]">
     <!-- Left Info Panel -->
-    <div class="w-64 bg-white border-r border-slate-200 p-6 flex flex-col">
+    <div class="hidden lg:flex w-64 bg-white border-r border-slate-200 p-6 flex-col">
       <h2 class="text-lg font-semibold text-slate-900 mb-6">Chat Info</h2>
 
       <div class="space-y-4">
@@ -119,7 +125,7 @@ watch(() => conversationsStore.messages.length, () => {
           </p>
         </div>
 
-        <div v-if="currentCandidate?.candidate_ai_score">
+        <div v-if="currentCandidate?.candidate_ai_score !== null && currentCandidate?.candidate_ai_score !== undefined">
           <label class="text-xs font-medium text-slate-500 uppercase">AI Score</label>
           <div class="flex items-center gap-2">
             <div class="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
@@ -135,16 +141,7 @@ watch(() => conversationsStore.messages.length, () => {
 
         <div>
           <label class="text-xs font-medium text-slate-500 uppercase">Job Position</label>
-          <p class="text-slate-900">Senior Developer</p>
-        </div>
-
-        <div>
-          <span
-            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-            :class="apiPowered ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'"
-          >
-            {{ apiPowered ? '🤖 AI Powered' : '⚙️ Mock Mode' }}
-          </span>
+          <p class="text-slate-900">{{ candidateProfile?.job_position?.title || 'Not linked' }}</p>
         </div>
       </div>
     </div>
@@ -159,8 +156,8 @@ watch(() => conversationsStore.messages.length, () => {
 
         <!-- Empty State with Suggestions -->
         <div v-else-if="conversationsStore.messages.length === 0" class="flex flex-col items-center justify-center h-full text-center px-4">
-          <div class="w-16 h-16 mb-4 rounded-full bg-indigo-100 flex items-center justify-center">
-            <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div class="w-16 h-16 mb-4 rounded-full bg-cyan-100 flex items-center justify-center">
+            <svg class="w-8 h-8 text-cyan-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
             </svg>
           </div>
@@ -187,12 +184,12 @@ watch(() => conversationsStore.messages.length, () => {
           >
             <div
               class="max-w-[70%] rounded-2xl px-4 py-3 shadow-sm"
-              :class="message.role === 'user' ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'"
+              :class="message.role === 'user' ? 'bg-cyan-700 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'"
             >
               <p class="whitespace-pre-wrap">{{ message.content }}</p>
               <p
                 class="text-xs mt-1"
-                :class="message.role === 'user' ? 'text-indigo-200' : 'text-slate-400'"
+                :class="message.role === 'user' ? 'text-cyan-100' : 'text-slate-400'"
               >
                 {{ formatDate(message.created_at) }}
               </p>
@@ -222,7 +219,7 @@ watch(() => conversationsStore.messages.length, () => {
             @keydown="handleKeydown"
             placeholder="Type your message..."
             rows="1"
-            class="flex-1 px-4 py-2 border border-slate-300 rounded-lg resize-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            class="flex-1 px-4 py-2 border border-slate-300 rounded-lg resize-none focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
             :disabled="isSending"
           />
           <Button variant="primary" type="submit" :disabled="!messageInput.trim() || isSending">

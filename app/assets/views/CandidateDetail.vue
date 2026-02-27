@@ -1,15 +1,15 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCandidatesStore } from '../stores/candidates.js'
-import { useJobsStore } from '../stores/jobs.js'
 import { useConversationsStore } from '../stores/conversations.js'
+import { useJobsStore } from '../stores/jobs.js'
 import { candidatesApi } from '../api/client.js'
-import Card from '../components/ui/Card.vue'
-import Button from '../components/ui/Button.vue'
 import Badge from '../components/ui/Badge.vue'
-import Spinner from '../components/ui/Spinner.vue'
+import Button from '../components/ui/Button.vue'
+import Card from '../components/ui/Card.vue'
 import Modal from '../components/ui/Modal.vue'
+import Spinner from '../components/ui/Spinner.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,37 +19,39 @@ const conversationsStore = useConversationsStore()
 
 const candidateId = computed(() => Number(route.params.id))
 const pollInterval = ref(null)
-const showQuestionsModal = ref(false)
-const showChatModal = ref(false)
-const interviewQuestions = ref([])
 const isProcessing = ref(false)
-const chatQuestion = ref('')
-const chatAnswer = ref('')
+const interviewQuestions = ref([])
 const selectedJobId = ref(null)
+const selectedJobForScore = ref(null)
 
-// Status update modals
+const showQuestionsModal = ref(false)
 const showShortlistModal = ref(false)
 const showRejectModal = ref(false)
+const showScoreModal = ref(false)
+
 const statusLoading = ref(false)
+const scoreLoading = ref(false)
 const toast = ref({ show: false, message: '', type: 'success' })
 
-const extractedData = computed(() => {
-  if (!candidatesStore.currentCandidate?.ai_extracted_data) return null
-  return candidatesStore.currentCandidate.ai_extracted_data
-})
+const candidate = computed(() => candidatesStore.currentCandidate)
+const extractedData = computed(() => candidate.value?.ai_extracted_data || {})
+const skills = computed(() => extractedData.value.skills || [])
+const education = computed(() => extractedData.value.education || [])
+const languages = computed(() => extractedData.value.languages || [])
+const yearsExperience = computed(() => extractedData.value.years_experience ?? null)
+const phone = computed(() => extractedData.value.phone || null)
 
-const skills = computed(() => extractedData.value?.skills || [])
-const yearsExperience = computed(() => extractedData.value?.years_experience || 'N/A')
-const education = computed(() => extractedData.value?.education || [])
-const languages = computed(() => extractedData.value?.languages || [])
+const availableJobs = computed(() => jobsStore.jobs.filter(job => job.status !== 'closed'))
 
-// Computed for button visibility
-const isShortlistedOrRejected = computed(() => {
-  const status = candidatesStore.currentCandidate?.status
-  return status === 'shortlisted' || status === 'rejected'
-})
+const showToast = (message, type = 'success') => {
+  toast.value = { show: true, message, type }
+  setTimeout(() => {
+    toast.value.show = false
+  }, 3000)
+}
 
 const formatDate = (date) => {
+  if (!date) return '-'
   return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -65,28 +67,31 @@ const getStatusVariant = (status) => {
 }
 
 const getScoreColor = (score) => {
-  if (score === null) return 'bg-slate-200'
+  if (score === null || score === undefined) return 'bg-slate-300'
   if (score <= 40) return 'bg-rose-500'
   if (score <= 70) return 'bg-amber-500'
   return 'bg-emerald-500'
 }
 
-const showToast = (message, type = 'success') => {
-  toast.value = { show: true, message, type }
-  setTimeout(() => {
-    toast.value.show = false
-  }, 3000)
+const getScoreTextColor = (score) => {
+  if (score === null || score === undefined) return 'text-slate-400'
+  if (score <= 40) return 'text-rose-600'
+  if (score <= 70) return 'text-amber-600'
+  return 'text-emerald-600'
 }
 
+const isShortlistedOrRejected = computed(() => {
+  return candidate.value?.status === 'shortlisted' || candidate.value?.status === 'rejected'
+})
+
 const startPolling = () => {
-  if (candidatesStore.currentCandidate?.status === 'processing') {
-    pollInterval.value = window.setInterval(async () => {
-      await candidatesStore.fetchCandidate(candidateId.value)
-      if (candidatesStore.currentCandidate?.status !== 'processing') {
-        stopPolling()
-      }
-    }, 3000)
-  }
+  if (pollInterval.value || candidate.value?.status !== 'processing') return
+  pollInterval.value = setInterval(async () => {
+    await candidatesStore.fetchCandidate(candidateId.value)
+    if (candidate.value?.status !== 'processing') {
+      stopPolling()
+    }
+  }, 3000)
 }
 
 const stopPolling = () => {
@@ -101,8 +106,9 @@ const handleShortlist = async () => {
   try {
     await candidatesStore.updateCandidateStatus(candidateId.value, 'shortlisted')
     showShortlistModal.value = false
-    showToast('Candidate shortlisted!')
-  } catch (e) {
+    showToast('Candidate shortlisted')
+  } catch (error) {
+    console.error(error)
     showToast('Failed to shortlist candidate', 'error')
   } finally {
     statusLoading.value = false
@@ -115,7 +121,8 @@ const handleReject = async () => {
     await candidatesStore.updateCandidateStatus(candidateId.value, 'rejected')
     showRejectModal.value = false
     showToast('Candidate rejected')
-  } catch (e) {
+  } catch (error) {
+    console.error(error)
     showToast('Failed to reject candidate', 'error')
   } finally {
     statusLoading.value = false
@@ -127,10 +134,32 @@ const handleRestore = async () => {
   try {
     await candidatesStore.updateCandidateStatus(candidateId.value, 'ready')
     showToast('Candidate restored to ready')
-  } catch (e) {
+  } catch (error) {
+    console.error(error)
     showToast('Failed to restore candidate', 'error')
   } finally {
     statusLoading.value = false
+  }
+}
+
+const openScoreModal = () => {
+  selectedJobForScore.value = candidate.value?.job_position?.id || null
+  showScoreModal.value = true
+}
+
+const submitScore = async () => {
+  if (!selectedJobForScore.value) return
+  scoreLoading.value = true
+  try {
+    await candidatesStore.scoreCandidate(candidateId.value, selectedJobForScore.value)
+    await candidatesStore.fetchCandidate(candidateId.value)
+    showScoreModal.value = false
+    showToast('Score updated')
+  } catch (error) {
+    console.error(error)
+    showToast('Failed to calculate score', 'error')
+  } finally {
+    scoreLoading.value = false
   }
 }
 
@@ -138,8 +167,9 @@ const startChat = async () => {
   try {
     const conversation = await conversationsStore.createConversation(candidateId.value)
     router.push(`/chat/${conversation.id}`)
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
+    showToast('Failed to start chat', 'error')
   }
 }
 
@@ -147,25 +177,12 @@ const generateQuestions = async () => {
   isProcessing.value = true
   showQuestionsModal.value = true
   try {
-    const res = await candidatesApi.interviewQuestions(candidateId.value, selectedJobId.value)
-    interviewQuestions.value = res.data.questions
-  } catch (e) {
-    console.error(e)
+    const response = await candidatesApi.interviewQuestions(candidateId.value, selectedJobId.value)
+    interviewQuestions.value = response.data.questions || []
+  } catch (error) {
+    console.error(error)
     interviewQuestions.value = []
-  } finally {
-    isProcessing.value = false
-  }
-}
-
-const askQuestion = async () => {
-  if (!chatQuestion.value.trim()) return
-  isProcessing.value = true
-  try {
-    const res = await candidatesApi.chat(candidateId.value, chatQuestion.value)
-    chatAnswer.value = res.data.answer
-  } catch (e) {
-    console.error(e)
-    chatAnswer.value = 'Sorry, I could not get an answer.'
+    showToast('Failed to generate interview questions', 'error')
   } finally {
     isProcessing.value = false
   }
@@ -173,13 +190,11 @@ const askQuestion = async () => {
 
 onMounted(async () => {
   try {
-    await Promise.all([
-      candidatesStore.fetchCandidate(candidateId.value),
-      jobsStore.fetchJobs()
-    ])
+    await Promise.all([candidatesStore.fetchCandidate(candidateId.value), jobsStore.fetchJobs()])
+    selectedJobId.value = candidate.value?.job_position?.id || null
     startPolling()
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
   }
 })
 
@@ -190,164 +205,152 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-6">
-    <!-- Toast Notification -->
     <div
       v-if="toast.show"
-      class="fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg transition-all duration-200"
-      :class="toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'"
+      class="fixed top-5 right-5 z-50 px-4 py-2 rounded-xl shadow-lg text-white"
+      :class="toast.type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'"
     >
       {{ toast.message }}
     </div>
 
-    <div class="flex items-center gap-4">
-      <button @click="$router.back()" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+    <section class="flex items-center gap-3">
+      <button class="p-2 rounded-xl border border-slate-300 hover:bg-slate-100" @click="$router.back()">
         <svg class="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
-      <h1 class="text-2xl font-bold text-slate-900">Candidate Details</h1>
-    </div>
+      <div>
+        <h1 class="text-2xl font-semibold text-slate-900">Candidate Review</h1>
+        <p class="text-sm text-slate-500">Profile details, AI output, and hiring actions.</p>
+      </div>
+    </section>
 
-    <div v-if="candidatesStore.loading && !candidatesStore.currentCandidate" class="flex items-center justify-center py-12">
+    <div v-if="candidatesStore.loading && !candidate" class="flex items-center justify-center py-12">
       <Spinner size="lg" />
     </div>
 
-    <template v-else-if="candidatesStore.currentCandidate">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Main Info -->
-        <div class="lg:col-span-2 space-y-6">
-          <Card padding="md">
-            <div class="flex items-start justify-between mb-6">
+    <template v-else-if="candidate">
+      <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+        <div class="xl:col-span-2 space-y-5">
+          <Card>
+            <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6">
               <div class="flex items-center gap-4">
-                <div class="w-16 h-16 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <span class="text-2xl font-bold text-indigo-600">
-                    {{ candidatesStore.currentCandidate.name.charAt(0).toUpperCase() }}
+                <div class="w-16 h-16 rounded-2xl bg-cyan-100 flex items-center justify-center">
+                  <span class="text-2xl font-bold text-cyan-700">
+                    {{ (candidate.name || '?').charAt(0).toUpperCase() }}
                   </span>
                 </div>
                 <div>
-                  <h2 class="text-xl font-bold text-slate-900">{{ candidatesStore.currentCandidate.name }}</h2>
-                  <p class="text-slate-500">{{ candidatesStore.currentCandidate.email || 'No email' }}</p>
+                  <h2 class="text-2xl font-semibold text-slate-900">{{ candidate.name }}</h2>
+                  <p class="text-slate-600">{{ candidate.email || 'No email available' }}</p>
+                  <p v-if="phone" class="text-sm text-slate-500 mt-1">{{ phone }}</p>
                 </div>
               </div>
-              <Badge :variant="getStatusVariant(candidatesStore.currentCandidate.status)">
-                <span v-if="candidatesStore.currentCandidate.status === 'processing'" class="flex items-center gap-1">
-                  <Spinner size="sm" />
-                  Processing
-                </span>
-                <span v-else>{{ candidatesStore.currentCandidate.status }}</span>
-              </Badge>
+              <div class="flex items-center gap-2">
+                <Badge :variant="getStatusVariant(candidate.status)">
+                  <span v-if="candidate.status === 'processing'" class="flex items-center gap-1">
+                    <Spinner size="sm" />
+                    Processing
+                  </span>
+                  <span v-else>{{ candidate.status }}</span>
+                </Badge>
+              </div>
             </div>
 
-            <!-- AI Score Bar -->
             <div class="mb-6">
               <div class="flex items-center justify-between mb-2">
-                <span class="text-sm font-medium text-slate-700">AI Score</span>
-                <span class="text-sm font-bold" :class="getScoreColor(candidatesStore.currentCandidate.ai_score).replace('bg-', 'text-')">
-                  {{ candidatesStore.currentCandidate.ai_score !== null ? candidatesStore.currentCandidate.ai_score : 'N/A' }}
+                <span class="text-sm font-medium text-slate-700">AI Fit Score</span>
+                <span class="text-lg font-semibold" :class="getScoreTextColor(candidate.ai_score)">
+                  {{ candidate.ai_score ?? 'N/A' }}
                 </span>
               </div>
               <div class="w-full h-3 bg-slate-200 rounded-full overflow-hidden">
                 <div
                   class="h-full rounded-full transition-all duration-500"
-                  :class="getScoreColor(candidatesStore.currentCandidate.ai_score)"
-                  :style="{ width: candidatesStore.currentCandidate.ai_score ? `${candidatesStore.currentCandidate.ai_score}%` : '0%' }"
+                  :class="getScoreColor(candidate.ai_score)"
+                  :style="{ width: candidate.ai_score ? `${candidate.ai_score}%` : '0%' }"
                 />
               </div>
+              <p class="text-xs text-slate-500 mt-2">
+                Linked job: {{ candidate.job_position?.title || 'Not linked yet' }}
+              </p>
             </div>
 
-            <!-- AI Summary -->
-            <div v-if="candidatesStore.currentCandidate.ai_summary" class="p-4 bg-slate-50 rounded-lg">
+            <div v-if="candidate.ai_summary" class="p-4 rounded-xl bg-slate-100">
               <h3 class="text-sm font-semibold text-slate-700 mb-2">AI Summary</h3>
-              <p class="text-slate-600">{{ candidatesStore.currentCandidate.ai_summary }}</p>
+              <p class="text-slate-700">{{ candidate.ai_summary }}</p>
             </div>
           </Card>
 
-          <!-- Extracted Data -->
-          <Card v-if="extractedData" padding="md">
-            <h3 class="text-lg font-semibold text-slate-900 mb-4">AI Extracted Data</h3>
+          <Card v-if="Object.keys(extractedData).length > 0">
+            <h3 class="text-lg font-semibold text-slate-900 mb-4">Extracted Profile Data</h3>
 
             <div v-if="skills.length > 0" class="mb-4">
-              <h4 class="text-sm font-medium text-slate-700 mb-2">Skills</h4>
+              <p class="text-sm font-medium text-slate-700 mb-2">Skills</p>
               <div class="flex flex-wrap gap-2">
                 <span
                   v-for="skill in skills"
                   :key="skill"
-                  class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm"
+                  class="px-3 py-1 rounded-full text-sm bg-cyan-100 text-cyan-800"
                 >
                   {{ skill }}
                 </span>
               </div>
             </div>
 
-            <div v-if="yearsExperience !== 'N/A'" class="mb-4">
-              <h4 class="text-sm font-medium text-slate-700 mb-1">Years of Experience</h4>
-              <p class="text-slate-600">{{ yearsExperience }}</p>
-            </div>
-
-            <div v-if="education.length > 0" class="mb-4">
-              <h4 class="text-sm font-medium text-slate-700 mb-2">Education</h4>
-              <ul class="space-y-1">
-                <li v-for="edu in education" :key="edu" class="text-slate-600">{{ edu }}</li>
-              </ul>
-            </div>
-
-            <div v-if="languages.length > 0">
-              <h4 class="text-sm font-medium text-slate-700 mb-2">Languages</h4>
-              <div class="flex flex-wrap gap-2">
-                <span
-                  v-for="lang in languages"
-                  :key="lang"
-                  class="px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm"
-                >
-                  {{ lang }}
-                </span>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div v-if="yearsExperience !== null">
+                <p class="text-sm font-medium text-slate-700 mb-1">Experience</p>
+                <p class="text-slate-600">{{ yearsExperience }} years</p>
               </div>
+              <div v-if="languages.length > 0">
+                <p class="text-sm font-medium text-slate-700 mb-1">Languages</p>
+                <p class="text-slate-600">{{ languages.join(', ') }}</p>
+              </div>
+            </div>
+
+            <div v-if="education.length > 0" class="mt-4">
+              <p class="text-sm font-medium text-slate-700 mb-2">Education</p>
+              <ul class="space-y-1">
+                <li v-for="entry in education" :key="entry" class="text-slate-600">• {{ entry }}</li>
+              </ul>
             </div>
           </Card>
         </div>
 
-        <!-- Sidebar Actions -->
-        <div class="space-y-6">
-          <Card padding="md">
-            <h3 class="text-lg font-semibold text-slate-900 mb-4">Actions</h3>
+        <div class="space-y-5">
+          <Card>
+            <h3 class="text-lg font-semibold text-slate-900 mb-4">Recruiter Actions</h3>
             <div class="space-y-3">
-              <!-- Shortlist/Reject buttons - show when not already shortlisted/rejected -->
               <template v-if="!isShortlistedOrRejected">
-                <Button variant="success" class="w-full" @click="showShortlistModal = true">
-                  Shortlist Candidate
-                </Button>
-                <Button variant="danger" class="w-full" @click="showRejectModal = true">
-                  Reject Candidate
-                </Button>
+                <Button variant="success" class="w-full" @click="showShortlistModal = true">Shortlist</Button>
+                <Button variant="danger" class="w-full" @click="showRejectModal = true">Reject</Button>
               </template>
-              <!-- Restore button - show when shortlisted or rejected -->
-              <template v-else>
-                <Button variant="secondary" class="w-full" @click="handleRestore" :disabled="statusLoading">
-                  Restore to Ready
-                </Button>
-              </template>
-              <Button variant="secondary" class="w-full" @click="generateQuestions">
-                Generate Interview Questions
+              <Button
+                v-else
+                variant="secondary"
+                class="w-full"
+                :disabled="statusLoading"
+                @click="handleRestore"
+              >
+                Restore to Ready
               </Button>
-              <Button variant="primary" class="w-full" @click="startChat">
-                Chat with CV
-              </Button>
+              <Button variant="secondary" class="w-full" @click="openScoreModal">Calculate Score</Button>
+              <Button variant="secondary" class="w-full" @click="generateQuestions">Interview Questions</Button>
+              <Button variant="primary" class="w-full" @click="startChat">Chat with CV</Button>
             </div>
           </Card>
 
-          <Card padding="md">
-            <p class="text-sm text-slate-500">
-              Added on {{ formatDate(candidatesStore.currentCandidate.created_at) }}
-            </p>
+          <Card>
+            <p class="text-sm text-slate-500">Created on {{ formatDate(candidate.created_at) }}</p>
           </Card>
         </div>
       </div>
     </template>
 
-    <!-- Shortlist Confirmation Modal -->
     <Modal v-model="showShortlistModal" title="Shortlist Candidate">
       <p class="text-slate-600">
-        Are you sure you want to shortlist <strong>{{ candidatesStore.currentCandidate?.name }}</strong>?
+        Shortlist <strong>{{ candidate?.name }}</strong> for the next stage?
       </p>
       <div class="flex justify-end gap-3 mt-6">
         <Button variant="ghost" @click="showShortlistModal = false">Cancel</Button>
@@ -358,10 +361,9 @@ onUnmounted(() => {
       </div>
     </Modal>
 
-    <!-- Reject Confirmation Modal -->
     <Modal v-model="showRejectModal" title="Reject Candidate">
       <p class="text-slate-600">
-        Are you sure you want to reject <strong>{{ candidatesStore.currentCandidate?.name }}</strong>? This cannot be undone.
+        Reject <strong>{{ candidate?.name }}</strong>? You can restore later from this page.
       </p>
       <div class="flex justify-end gap-3 mt-6">
         <Button variant="ghost" @click="showRejectModal = false">Cancel</Button>
@@ -372,19 +374,38 @@ onUnmounted(() => {
       </div>
     </Modal>
 
-    <!-- Interview Questions Modal -->
+    <Modal v-model="showScoreModal" title="Calculate Job Match Score">
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Job Position</label>
+          <select
+            v-model="selectedJobForScore"
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+          >
+            <option :value="null" disabled>Select a job</option>
+            <option v-for="job in availableJobs" :key="job.id" :value="job.id">{{ job.title }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="flex justify-end gap-3 mt-6">
+        <Button variant="ghost" @click="showScoreModal = false">Cancel</Button>
+        <Button variant="primary" :disabled="!selectedJobForScore || scoreLoading" @click="submitScore">
+          <Spinner v-if="scoreLoading" size="sm" class="mr-2" />
+          Calculate
+        </Button>
+      </div>
+    </Modal>
+
     <Modal v-model="showQuestionsModal" title="Interview Questions">
       <div class="space-y-4">
         <div>
           <label class="block text-sm font-medium text-slate-700 mb-1">Job Position (optional)</label>
           <select
             v-model="selectedJobId"
-            class="w-full px-3 py-2 border border-slate-300 rounded-lg"
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
           >
             <option :value="null">General questions</option>
-            <option v-for="job in jobsStore.jobs" :key="job.id" :value="job.id">
-              {{ job.title }}
-            </option>
+            <option v-for="job in jobsStore.jobs" :key="job.id" :value="job.id">{{ job.title }}</option>
           </select>
         </div>
         <div v-if="isProcessing" class="flex justify-center py-8">
@@ -394,18 +415,16 @@ onUnmounted(() => {
           <div
             v-for="(question, index) in interviewQuestions"
             :key="index"
-            class="p-3 bg-slate-50 rounded-lg text-sm text-slate-700"
+            class="p-3 rounded-xl bg-slate-100 text-sm text-slate-700"
           >
-            {{ index + 1 }}. {{ question }}
+            {{ index + 1 }}. {{ question.question || question }}
           </div>
         </div>
-        <p v-else class="text-slate-500 text-center py-4">Click "Generate" to create questions</p>
+        <p v-else class="text-slate-500 text-center py-6">Click generate to create tailored questions.</p>
       </div>
       <div class="flex justify-end gap-3 mt-6">
         <Button variant="ghost" @click="showQuestionsModal = false">Close</Button>
-        <Button variant="primary" :disabled="isProcessing" @click="generateQuestions">
-          Generate
-        </Button>
+        <Button variant="primary" :disabled="isProcessing" @click="generateQuestions">Generate</Button>
       </div>
     </Modal>
   </div>

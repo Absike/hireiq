@@ -11,7 +11,7 @@ defineProps({
 
 <template>
   <div
-    class="bg-white rounded-lg border border-slate-200 shadow-sm"
+    class="bg-white/95 rounded-2xl border border-slate-200 shadow-sm backdrop-blur"
     :class="{
       'p-0': padding === 'none',
       'p-3': padding === 'sm',

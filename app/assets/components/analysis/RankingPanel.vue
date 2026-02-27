@@ -16,7 +16,6 @@ const selectedJobId = ref(null)
 const selectedCandidateIds = ref([])
 const rankingResults = ref([])
 const isLoading = ref(false)
-const apiPowered = ref(true)
 const error = ref(null)
 
 // Filter candidates with status 'ready' or 'shortlisted'
@@ -83,7 +82,6 @@ const runRanking = async () => {
     const response = await analysisApi.rank(selectedJobId.value, selectedCandidateIds.value)
     const payload = response?.data ?? {}
     rankingResults.value = Array.isArray(payload) ? payload : (payload.ranked ?? [])
-    apiPowered.value = payload.ai_powered !== false
   } catch (e) {
     console.error(e)
     rankingResults.value = []
@@ -109,10 +107,6 @@ const shortlistCandidate = async (id) => {
     console.error(e)
   }
 }
-
-const copySummary = (summary) => {
-  navigator.clipboard.writeText(summary)
-}
 </script>
 
 <template>
@@ -124,7 +118,7 @@ const copySummary = (summary) => {
         <label class="block text-sm font-medium text-slate-700 mb-1">Job Position</label>
         <select
           v-model="selectedJobId"
-          class="w-full md:w-80 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          class="w-full md:w-80 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-cyan-500"
         >
           <option :value="null">Select a job</option>
           <option v-for="job in jobsStore.jobs" :key="job.id" :value="job.id">
@@ -143,7 +137,7 @@ const copySummary = (summary) => {
             type="checkbox"
             :checked="selectedCandidateIds.length === eligibleCandidates.length && eligibleCandidates.length > 0"
             @change="toggleAll"
-            class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+            class="w-4 h-4 text-cyan-700 rounded border-slate-300 focus:ring-cyan-500"
           >
           Select All
         </label>
@@ -159,19 +153,19 @@ const copySummary = (summary) => {
           :key="candidate.id"
           class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all duration-200"
           :class="selectedCandidateIds.includes(candidate.id)
-            ? 'bg-indigo-50 border-indigo-300'
+            ? 'bg-cyan-50 border-cyan-300'
             : 'bg-white border-slate-200 hover:border-slate-300'"
         >
           <input
             type="checkbox"
             :checked="selectedCandidateIds.includes(candidate.id)"
             @change="toggleCandidate(candidate.id)"
-            class="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+            class="w-4 h-4 text-cyan-700 rounded border-slate-300 focus:ring-cyan-500"
           >
           <div class="flex-1 min-w-0">
             <p class="font-medium text-slate-900 truncate">{{ candidate.name }}</p>
             <div class="flex items-center gap-2 mt-1">
-              <Badge :variant="getStatusVariant(candidate.status)" size="sm" />
+              <Badge :variant="getStatusVariant(candidate.status)" size="sm">{{ candidate.status }}</Badge>
               <span v-if="candidate.ai_score" class="text-sm text-slate-500">
                 Score: {{ candidate.ai_score }}
               </span>
@@ -189,19 +183,10 @@ const copySummary = (summary) => {
         @click="runRanking"
       >
         <Spinner v-if="isLoading" size="sm" class="mr-2" />
-        🤖 Rank Candidates
+        Rank Candidates
       </Button>
-      <span
-        v-if="apiPowered"
-        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700"
-      >
-        🤖 AI Powered
-      </span>
-      <span
-        v-else
-        class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700"
-      >
-        ⚙️ Mock Mode
+      <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+        AI Powered
       </span>
     </div>
 

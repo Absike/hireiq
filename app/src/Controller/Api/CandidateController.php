@@ -38,6 +38,11 @@ class CandidateController extends AbstractController
             'ai_score'   => $c->getAiScore(),
             'ai_summary' => $c->getAiSummary(),
             'ai_extracted_data' => $c->getAiExtractedData(),
+            'job_position' => $c->getJobPosition() ? [
+                'id' => $c->getJobPosition()->getId(),
+                'title' => $c->getJobPosition()->getTitle(),
+                'status' => $c->getJobPosition()->getStatus(),
+            ] : null,
             'created_at' => $c->getCreatedAt()->format('Y-m-d H:i:s'),
         ], $candidates));
     }
@@ -119,6 +124,9 @@ class CandidateController extends AbstractController
             'status'     => $candidate->getStatus(),
             'ai_score'   => $candidate->getAiScore(),
             'ai_summary' => $candidate->getAiSummary(),
+            'ai_extracted_data' => $candidate->getAiExtractedData(),
+            'job_position' => null,
+            'created_at' => $candidate->getCreatedAt()->format('Y-m-d H:i:s'),
             'document_id' => $document->getId(),
             'message'    => 'CV uploaded successfully. AI processing started.',
         ], 201);
@@ -141,6 +149,11 @@ class CandidateController extends AbstractController
             'ai_score'          => $candidate->getAiScore(),
             'ai_summary'        => $candidate->getAiSummary(),
             'ai_extracted_data' => $candidate->getAiExtractedData(),
+            'job_position'      => $candidate->getJobPosition() ? [
+                'id' => $candidate->getJobPosition()->getId(),
+                'title' => $candidate->getJobPosition()->getTitle(),
+                'status' => $candidate->getJobPosition()->getStatus(),
+            ] : null,
             'created_at'        => $candidate->getCreatedAt()->format('Y-m-d H:i:s'),
         ]);
     }
@@ -265,6 +278,11 @@ class CandidateController extends AbstractController
         return $this->json([
             'candidate_id' => $candidate->getId(),
             'job_position_id' => $jobPosition->getId(),
+            'job_position' => [
+                'id' => $jobPosition->getId(),
+                'title' => $jobPosition->getTitle(),
+                'status' => $jobPosition->getStatus(),
+            ],
             'score' => $result['score'],
             'summary' => $result['summary'],
         ]);

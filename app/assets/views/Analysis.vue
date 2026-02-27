@@ -25,28 +25,31 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <h1 class="text-2xl font-bold text-slate-900">Analysis</h1>
+    <div>
+      <h1 class="text-2xl font-semibold text-slate-900">AI Analysis</h1>
+      <p class="text-sm text-slate-500 mt-1">Run ranking, side-by-side comparison, and interview prep from one workspace.</p>
+    </div>
 
     <!-- Tabs -->
     <div class="border-b border-slate-200">
       <nav class="flex gap-8">
         <button
           class="py-3 px-1 border-b-2 font-medium text-sm transition-colors"
-          :class="activeTab === 'rank' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+          :class="activeTab === 'rank' ? 'border-cyan-600 text-cyan-700' : 'border-transparent text-slate-500 hover:text-slate-700'"
           @click="activeTab = 'rank'"
         >
           Rank Candidates
         </button>
         <button
           class="py-3 px-1 border-b-2 font-medium text-sm transition-colors"
-          :class="activeTab === 'compare' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+          :class="activeTab === 'compare' ? 'border-cyan-600 text-cyan-700' : 'border-transparent text-slate-500 hover:text-slate-700'"
           @click="activeTab = 'compare'"
         >
           Compare Candidates
         </button>
         <button
           class="py-3 px-1 border-b-2 font-medium text-sm transition-colors"
-          :class="activeTab === 'interview' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'"
+          :class="activeTab === 'interview' ? 'border-cyan-600 text-cyan-700' : 'border-transparent text-slate-500 hover:text-slate-700'"
           @click="activeTab = 'interview'"
         >
           Interview Questions

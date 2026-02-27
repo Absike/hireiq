@@ -1,13 +1,13 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useCandidatesStore } from '../stores/candidates.js'
 import { useJobsStore } from '../stores/jobs.js'
-import Card from '../components/ui/Card.vue'
-import Button from '../components/ui/Button.vue'
 import Badge from '../components/ui/Badge.vue'
-import Spinner from '../components/ui/Spinner.vue'
-import Modal from '../components/ui/Modal.vue'
+import Button from '../components/ui/Button.vue'
+import Card from '../components/ui/Card.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
+import Modal from '../components/ui/Modal.vue'
+import Spinner from '../components/ui/Spinner.vue'
 
 const candidatesStore = useCandidatesStore()
 const jobsStore = useJobsStore()
@@ -22,6 +22,10 @@ const isScoring = ref(false)
 const dragOver = ref(false)
 const uploadFile = ref(null)
 const pollInterval = ref(null)
+
+const searchQuery = ref('')
+const statusFilter = ref('all')
+const sortBy = ref('newest')
 
 const formatDate = (date) => {
   if (!date) return '-'
@@ -45,6 +49,38 @@ const getScoreColor = (score) => {
   if (score <= 70) return 'text-amber-500'
   return 'text-emerald-500'
 }
+
+const pipelineStats = computed(() => ({
+  total: candidatesStore.candidates.length,
+  processing: candidatesStore.candidates.filter(candidate => candidate.status === 'processing').length,
+  ready: candidatesStore.candidates.filter(candidate => candidate.status === 'ready').length,
+  shortlisted: candidatesStore.candidates.filter(candidate => candidate.status === 'shortlisted').length,
+}))
+
+const availableJobs = computed(() => jobsStore.jobs.filter(job => job.status !== 'closed'))
+
+const filteredCandidates = computed(() => {
+  const normalizedSearch = searchQuery.value.trim().toLowerCase()
+
+  const filtered = candidatesStore.candidates.filter((candidate) => {
+    const matchesSearch = !normalizedSearch ||
+      candidate.name?.toLowerCase().includes(normalizedSearch) ||
+      candidate.email?.toLowerCase().includes(normalizedSearch)
+
+    const matchesStatus = statusFilter.value === 'all' || candidate.status === statusFilter.value
+
+    return matchesSearch && matchesStatus
+  })
+
+  return filtered.sort((a, b) => {
+    if (sortBy.value === 'newest') return new Date(b.created_at) - new Date(a.created_at)
+    if (sortBy.value === 'oldest') return new Date(a.created_at) - new Date(b.created_at)
+    if (sortBy.value === 'name') return (a.name || '').localeCompare(b.name || '')
+    if (sortBy.value === 'score_desc') return (b.ai_score ?? -1) - (a.ai_score ?? -1)
+    if (sortBy.value === 'score_asc') return (a.ai_score ?? 101) - (b.ai_score ?? 101)
+    return 0
+  })
+})
 
 const handleFileSelect = (event) => {
   const target = event.target
@@ -72,14 +108,10 @@ const handleDragLeave = () => {
 
 const startPolling = () => {
   if (pollInterval.value) return
-  console.log('Starting polling...')
   pollInterval.value = setInterval(async () => {
-    console.log('Polling for updates...')
     await candidatesStore.fetchCandidates()
-    const hasProcessing = candidatesStore.candidates.some(c => c.status === 'processing')
-    console.log('Processing status:', candidatesStore.candidates.map(c => ({ id: c.id, name: c.name, status: c.status, email: c.email })))
+    const hasProcessing = candidatesStore.candidates.some(candidate => candidate.status === 'processing')
     if (!hasProcessing) {
-      console.log('All processed, stopping polling')
       stopPolling()
     }
   }, 3000)
@@ -100,12 +132,11 @@ const submitUpload = async () => {
     const formData = new FormData()
     formData.append('cv', uploadFile.value)
     await candidatesStore.uploadCandidate(formData)
-    // Start polling to track processing status
-    startPolling()
     showUploadModal.value = false
     uploadFile.value = null
-  } catch (e) {
-    console.error(e)
+    startPolling()
+  } catch (error) {
+    console.error(error)
   } finally {
     isUploading.value = false
   }
@@ -113,7 +144,7 @@ const submitUpload = async () => {
 
 const openScoreModal = (candidate) => {
   selectedCandidate.value = candidate
-  selectedJobForScore.value = null
+  selectedJobForScore.value = candidate.job_position?.id || null
   showScoreModal.value = true
 }
 
@@ -125,8 +156,8 @@ const submitScore = async () => {
     await candidatesStore.scoreCandidate(selectedCandidate.value.id, selectedJobForScore.value)
     await candidatesStore.fetchCandidate(selectedCandidate.value.id)
     showScoreModal.value = false
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
   } finally {
     isScoring.value = false
   }
@@ -144,22 +175,40 @@ const deleteCandidate = async () => {
     await candidatesStore.deleteCandidate(selectedCandidate.value.id)
     showDeleteModal.value = false
     selectedCandidate.value = null
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
+  }
+}
+
+const quickStatusLabel = (status) => {
+  if (status === 'ready') return 'Shortlist'
+  if (status === 'shortlisted' || status === 'rejected') return 'Restore'
+  if (status === 'new') return 'Mark Ready'
+  return null
+}
+
+const updateQuickStatus = async (candidate) => {
+  let nextStatus = null
+  if (candidate.status === 'ready') nextStatus = 'shortlisted'
+  if (candidate.status === 'shortlisted' || candidate.status === 'rejected') nextStatus = 'ready'
+  if (candidate.status === 'new') nextStatus = 'ready'
+  if (!nextStatus) return
+
+  try {
+    await candidatesStore.updateCandidateStatus(candidate.id, nextStatus)
+  } catch (error) {
+    console.error(error)
   }
 }
 
 onMounted(async () => {
   try {
-    await Promise.all([
-      candidatesStore.fetchCandidates(),
-      jobsStore.fetchJobs()
-    ])
-    if (candidatesStore.candidates.some(c => c.status === 'processing')) {
+    await Promise.all([candidatesStore.fetchCandidates(), jobsStore.fetchJobs()])
+    if (candidatesStore.candidates.some(candidate => candidate.status === 'processing')) {
       startPolling()
     }
-  } catch (e) {
-    console.error(e)
+  } catch (error) {
+    console.error(error)
   }
 })
 
@@ -169,13 +218,74 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold text-slate-900">Candidates</h1>
-      <Button variant="primary" @click="showUploadModal = true">
-        Upload CV
-      </Button>
-    </div>
+  <div class="space-y-5">
+    <section class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div>
+        <h1 class="text-2xl font-semibold text-slate-900">Candidate Pipeline</h1>
+        <p class="text-sm text-slate-500">Track extraction, scoring, and hiring decisions from one table.</p>
+      </div>
+      <Button variant="primary" @click="showUploadModal = true">Upload CV</Button>
+    </section>
+
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <Card class="text-center">
+        <p class="text-xs uppercase tracking-wide text-slate-500">Total</p>
+        <p class="text-2xl font-semibold text-slate-900 mt-1">{{ pipelineStats.total }}</p>
+      </Card>
+      <Card class="text-center">
+        <p class="text-xs uppercase tracking-wide text-amber-700">Processing</p>
+        <p class="text-2xl font-semibold text-amber-900 mt-1">{{ pipelineStats.processing }}</p>
+      </Card>
+      <Card class="text-center">
+        <p class="text-xs uppercase tracking-wide text-cyan-700">Ready</p>
+        <p class="text-2xl font-semibold text-cyan-900 mt-1">{{ pipelineStats.ready }}</p>
+      </Card>
+      <Card class="text-center">
+        <p class="text-xs uppercase tracking-wide text-emerald-700">Shortlisted</p>
+        <p class="text-2xl font-semibold text-emerald-900 mt-1">{{ pipelineStats.shortlisted }}</p>
+      </Card>
+    </section>
+
+    <Card>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1">Search</label>
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Candidate name or email"
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+          >
+        </div>
+        <div>
+          <label class="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1">Status</label>
+          <select
+            v-model="statusFilter"
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+          >
+            <option value="all">All statuses</option>
+            <option value="new">New</option>
+            <option value="processing">Processing</option>
+            <option value="ready">Ready</option>
+            <option value="shortlisted">Shortlisted</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium uppercase tracking-wide text-slate-500 mb-1">Sort</label>
+          <select
+            v-model="sortBy"
+            class="w-full px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+          >
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="score_desc">Highest score</option>
+            <option value="score_asc">Lowest score</option>
+            <option value="name">Name A-Z</option>
+          </select>
+        </div>
+      </div>
+    </Card>
 
     <div v-if="candidatesStore.loading && candidatesStore.candidates.length === 0" class="flex items-center justify-center py-12">
       <Spinner size="lg" />
@@ -184,46 +294,48 @@ onUnmounted(() => {
     <Card v-else-if="candidatesStore.candidates.length === 0" padding="none">
       <EmptyState
         title="No candidates yet"
-        description="Upload your first candidate CV to get started"
+        description="Upload your first candidate CV to start screening."
         action-label="Upload CV"
         @action="showUploadModal = true"
       />
     </Card>
 
+    <Card v-else-if="filteredCandidates.length === 0">
+      <p class="text-sm text-slate-500 text-center py-10">No candidates match your current filters.</p>
+    </Card>
+
     <Card v-else padding="none">
       <div class="overflow-x-auto">
-        <table class="w-full">
+        <table class="w-full min-w-[900px]">
           <thead class="bg-slate-50 border-b border-slate-200">
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Name</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Email</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">AI Score</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
-              <th class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+              <th class="px-5 py-3 text-left text-xs uppercase tracking-wide text-slate-500">Candidate</th>
+              <th class="px-5 py-3 text-left text-xs uppercase tracking-wide text-slate-500">Status</th>
+              <th class="px-5 py-3 text-left text-xs uppercase tracking-wide text-slate-500">Linked Job</th>
+              <th class="px-5 py-3 text-left text-xs uppercase tracking-wide text-slate-500">AI Score</th>
+              <th class="px-5 py-3 text-left text-xs uppercase tracking-wide text-slate-500">Added</th>
+              <th class="px-5 py-3 text-right text-xs uppercase tracking-wide text-slate-500">Actions</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-200">
             <tr
-              v-for="candidate in candidatesStore.candidates"
+              v-for="candidate in filteredCandidates"
               :key="candidate.id"
               class="hover:bg-slate-50 transition-colors cursor-pointer"
               @click="$router.push(`/candidates/${candidate.id}`)"
             >
-              <td class="px-6 py-4 whitespace-nowrap">
-                <div class="flex items-center">
-                  <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center mr-3">
-                    <span class="text-sm font-medium text-indigo-600">
-                      {{ candidate.status === 'processing' ? '⏳' : (candidate.name || '?').charAt(0).toUpperCase() }}
-                    </span>
+              <td class="px-5 py-4">
+                <div class="flex items-center gap-3">
+                  <div class="w-9 h-9 rounded-full bg-cyan-100 flex items-center justify-center text-cyan-700 font-semibold">
+                    {{ candidate.status === 'processing' ? '…' : (candidate.name || '?').charAt(0).toUpperCase() }}
                   </div>
-                  <span class="font-medium text-slate-900">
-                    {{ candidate.status === 'processing' ? 'Processing...' : (candidate.name || 'Unknown') }}
-                  </span>
+                  <div class="min-w-0">
+                    <p class="font-medium text-slate-900 truncate">{{ candidate.name || 'Unknown' }}</p>
+                    <p class="text-xs text-slate-500 truncate">{{ candidate.email || 'No email' }}</p>
+                  </div>
                 </div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-slate-500">{{ candidate.email || '-' }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">
+              <td class="px-5 py-4">
                 <Badge :variant="getStatusVariant(candidate.status)">
                   <span v-if="candidate.status === 'processing'" class="flex items-center gap-1">
                     <Spinner size="sm" />
@@ -232,32 +344,39 @@ onUnmounted(() => {
                   <span v-else>{{ candidate.status }}</span>
                 </Badge>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span :class="getScoreColor(candidate.ai_score)">
-                  {{ candidate.ai_score !== null ? candidate.ai_score : '-' }}
+              <td class="px-5 py-4 text-sm text-slate-600">
+                {{ candidate.job_position?.title || '-' }}
+              </td>
+              <td class="px-5 py-4">
+                <span :class="getScoreColor(candidate.ai_score)" class="font-semibold">
+                  {{ candidate.ai_score ?? '-' }}
                 </span>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-slate-500">{{ formatDate(candidate.created_at) }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-right">
-                <button
-                  class="text-indigo-600 hover:text-indigo-800 mr-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Score Candidate"
-                  :disabled="jobsStore.jobs.length === 0 || candidate.status === 'processing'"
-                  @click.stop="openScoreModal(candidate)"
-                >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </button>
-                <button
-                  class="text-rose-500 hover:text-rose-700 transition-colors"
-                  title="Delete"
-                  @click.stop="confirmDelete(candidate)"
-                >
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+              <td class="px-5 py-4 text-sm text-slate-500">{{ formatDate(candidate.created_at) }}</td>
+              <td class="px-5 py-4 text-right">
+                <div class="inline-flex items-center gap-2" @click.stop>
+                  <button
+                    class="px-2.5 py-1.5 rounded-lg text-xs border border-slate-300 text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                    :disabled="availableJobs.length === 0 || candidate.status === 'processing'"
+                    @click="openScoreModal(candidate)"
+                  >
+                    Score
+                  </button>
+                  <button
+                    v-if="quickStatusLabel(candidate.status)"
+                    class="px-2.5 py-1.5 rounded-lg text-xs border border-cyan-300 text-cyan-700 hover:bg-cyan-50 disabled:opacity-40"
+                    :disabled="candidate.status === 'processing'"
+                    @click="updateQuickStatus(candidate)"
+                  >
+                    {{ quickStatusLabel(candidate.status) }}
+                  </button>
+                  <button
+                    class="px-2.5 py-1.5 rounded-lg text-xs border border-rose-300 text-rose-600 hover:bg-rose-50"
+                    @click="confirmDelete(candidate)"
+                  >
+                    Delete
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -265,37 +384,31 @@ onUnmounted(() => {
       </div>
     </Card>
 
-    <!-- Upload Modal -->
     <Modal v-model="showUploadModal" title="Upload Candidate CV">
       <div class="space-y-4">
-        <p class="text-sm text-slate-600 mb-4">
-          Name and email will be automatically extracted from the CV using AI.
-        </p>
+        <p class="text-sm text-slate-600">We automatically extract profile data from PDF CV files.</p>
         <div
-          class="border-2 border-dashed rounded-lg p-8 text-center transition-colors"
-          :class="dragOver ? 'border-indigo-500 bg-indigo-50' : 'border-slate-300'"
+          class="border-2 border-dashed rounded-xl p-8 text-center transition-colors"
+          :class="dragOver ? 'border-cyan-500 bg-cyan-50' : 'border-slate-300'"
           @drop="handleDrop"
           @dragover="handleDragOver"
           @dragleave="handleDragLeave"
         >
           <input
+            id="file-upload"
             type="file"
             accept=".pdf"
             class="hidden"
-            id="file-upload"
             @change="handleFileSelect"
           >
-          <label for="file-upload" class="cursor-pointer">
-            <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-            </svg>
-            <p class="mt-2 text-sm text-slate-600">
-              <span class="font-medium text-indigo-600">Click to upload</span> or drag and drop
+          <label for="file-upload" class="cursor-pointer block">
+            <p class="text-sm text-slate-600">
+              <span class="font-medium text-cyan-700">Click to upload</span> or drag and drop
             </p>
-            <p class="mt-1 text-xs text-slate-500">PDF only</p>
+            <p class="text-xs text-slate-500 mt-1">PDF only</p>
           </label>
-          <div v-if="uploadFile" class="mt-4 p-3 bg-slate-50 rounded-lg">
-            <p class="text-sm font-medium text-slate-900">{{ uploadFile.name }}</p>
+          <div v-if="uploadFile" class="mt-4 p-3 bg-slate-100 rounded-lg text-left">
+            <p class="text-sm font-medium text-slate-900 truncate">{{ uploadFile.name }}</p>
             <p class="text-xs text-slate-500">{{ (uploadFile.size / 1024).toFixed(1) }} KB</p>
           </div>
         </div>
@@ -309,10 +422,9 @@ onUnmounted(() => {
       </div>
     </Modal>
 
-    <!-- Delete Confirmation Modal -->
     <Modal v-model="showDeleteModal" title="Delete Candidate">
       <p class="text-slate-600">
-        Are you sure you want to delete <strong>{{ selectedCandidate?.name }}</strong>? This action cannot be undone.
+        Delete <strong>{{ selectedCandidate?.name }}</strong>? This action cannot be undone.
       </p>
       <div class="flex justify-end gap-3 mt-6">
         <Button variant="ghost" @click="showDeleteModal = false">Cancel</Button>
@@ -320,36 +432,37 @@ onUnmounted(() => {
       </div>
     </Modal>
 
-    <!-- Score Modal -->
-    <Modal v-model="showScoreModal" title="Calculate AI Score">
+    <Modal v-model="showScoreModal" title="Calculate Job Match Score">
       <div class="space-y-4">
         <div>
-          <label class="block text-sm font-medium text-slate-700 mb-1">Select Job Position</label>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Job Position</label>
           <select
             v-model="selectedJobForScore"
-            class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            class="w-full px-3 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
           >
-            <option :value="null" disabled>Choose a job...</option>
-            <option v-for="job in jobsStore.jobs" :key="job.id" :value="job.id">
+            <option :value="null" disabled>Select a job</option>
+            <option v-for="job in availableJobs" :key="job.id" :value="job.id">
               {{ job.title }}
             </option>
           </select>
         </div>
-        <div v-if="selectedCandidate?.ai_score !== null" class="p-4 bg-slate-50 rounded-lg">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-medium text-slate-700">Current Score</span>
-            <span :class="getScoreColor(selectedCandidate.ai_score)" class="text-lg font-bold">
+        <div v-if="selectedCandidate?.ai_score !== null" class="p-4 bg-slate-100 rounded-xl">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-slate-600">Current score</span>
+            <span :class="getScoreColor(selectedCandidate.ai_score)" class="text-lg font-semibold">
               {{ selectedCandidate.ai_score }}
             </span>
           </div>
-          <p v-if="selectedCandidate.ai_summary" class="text-sm text-slate-600">{{ selectedCandidate.ai_summary }}</p>
+          <p v-if="selectedCandidate?.job_position?.title" class="text-xs text-slate-500 mt-2">
+            Last scored for: {{ selectedCandidate.job_position.title }}
+          </p>
         </div>
       </div>
       <div class="flex justify-end gap-3 mt-6">
         <Button variant="ghost" @click="showScoreModal = false">Cancel</Button>
         <Button variant="primary" :disabled="!selectedJobForScore || isScoring" @click="submitScore">
           <Spinner v-if="isScoring" size="sm" class="mr-2" />
-          Calculate Score
+          Calculate
         </Button>
       </div>
     </Modal>
