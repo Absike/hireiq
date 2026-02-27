@@ -8,6 +8,15 @@ export const useJobsStore = defineStore('jobs', () => {
   const loading = ref(false)
   const error = ref(null)
 
+  const upsertJob = (job) => {
+    const index = jobs.value.findIndex(j => j.id === job.id)
+    if (index !== -1) {
+      jobs.value[index] = job
+    } else {
+      jobs.value.unshift(job)
+    }
+  }
+
   async function fetchJobs() {
     loading.value = true
     error.value = null
@@ -42,7 +51,7 @@ export const useJobsStore = defineStore('jobs', () => {
     error.value = null
     try {
       const response = await jobsApi.create(data)
-      jobs.value.unshift(response.data)
+      upsertJob(response.data)
       return response.data
     } catch (e) {
       error.value = e.message || 'Failed to create job'
@@ -57,9 +66,9 @@ export const useJobsStore = defineStore('jobs', () => {
     error.value = null
     try {
       const response = await jobsApi.update(id, data)
-      const index = jobs.value.findIndex(j => j.id === id)
-      if (index !== -1) {
-        jobs.value[index] = response.data
+      upsertJob(response.data)
+      if (currentJob.value?.id === id) {
+        currentJob.value = response.data
       }
       return response.data
     } catch (e) {

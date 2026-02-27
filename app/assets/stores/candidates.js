@@ -8,6 +8,15 @@ export const useCandidatesStore = defineStore('candidates', () => {
   const loading = ref(false)
   const error = ref(null)
 
+  const upsertCandidate = (candidate) => {
+    const index = candidates.value.findIndex(c => c.id === candidate.id)
+    if (index !== -1) {
+      candidates.value[index] = { ...candidates.value[index], ...candidate }
+    } else {
+      candidates.value.unshift(candidate)
+    }
+  }
+
   async function fetchCandidates() {
     loading.value = true
     error.value = null
@@ -29,6 +38,7 @@ export const useCandidatesStore = defineStore('candidates', () => {
     try {
       const response = await candidatesApi.get(id)
       currentCandidate.value = response.data
+      upsertCandidate(response.data)
       return response.data
     } catch (e) {
       error.value = e.message || 'Failed to fetch candidate'
@@ -43,7 +53,7 @@ export const useCandidatesStore = defineStore('candidates', () => {
     error.value = null
     try {
       const response = await candidatesApi.upload(formData)
-      candidates.value.unshift(response.data)
+      upsertCandidate(response.data)
       return response.data
     } catch (e) {
       error.value = e.message || 'Failed to upload candidate'
@@ -74,6 +84,12 @@ export const useCandidatesStore = defineStore('candidates', () => {
       if (index !== -1) {
         candidates.value[index].ai_score = response.data.score
         candidates.value[index].ai_summary = response.data.summary
+        candidates.value[index].job_position = response.data.job_position || null
+      }
+      if (currentCandidate.value?.id === id) {
+        currentCandidate.value.ai_score = response.data.score
+        currentCandidate.value.ai_summary = response.data.summary
+        currentCandidate.value.job_position = response.data.job_position || null
       }
       return response.data
     } catch (e) {

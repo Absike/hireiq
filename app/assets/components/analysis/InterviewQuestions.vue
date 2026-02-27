@@ -68,11 +68,6 @@ const copyAllQuestions = async () => {
   }
 }
 
-// Get candidate name for display
-const getCandidateName = (id) => {
-  const candidate = candidatesStore.candidates.find(c => c.id === id)
-  return candidate?.name || 'Unknown'
-}
 </script>
 
 <template>

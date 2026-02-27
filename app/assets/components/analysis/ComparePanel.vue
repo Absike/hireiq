@@ -136,26 +136,6 @@ const formatYearsExperience = (candidateId) => {
   return `${years} year${years !== 1 ? 's' : ''}`
 }
 
-// Format work experience as summary
-const formatWorkExperience = (candidateId) => {
-  const data = getExtractedData(candidateId)
-  const exp = data.work_experience
-
-  if (!exp || !Array.isArray(exp) || exp.length === 0) {
-    // Fallback to years
-    return formatYearsExperience(candidateId)
-  }
-
-  // Get first 2 jobs
-  const jobs = exp.slice(0, 2).map(job => {
-    const title = job.title || 'Unknown'
-    const years = job.years || ''
-    return years ? `${title} (${years}y)` : title
-  })
-
-  return jobs.join(' | ')
-}
-
 // Format achievements
 const formatAchievements = (candidateId) => {
   const data = getExtractedData(candidateId)

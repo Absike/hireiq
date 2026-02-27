@@ -26,6 +26,7 @@ class JobController extends AbstractController
             'description'  => $j->getDescription(),
             'requirements' => $j->getRequirements(),
             'status'       => $j->getStatus(),
+            'candidates'   => $j->getCandidates()->count(),
             'created_at'   => $j->getCreatedAt()->format('Y-m-d H:i:s'),
         ], $jobs));
     }
@@ -39,10 +40,8 @@ class JobController extends AbstractController
             return $this->json(['error' => 'title and description are required'], 400);
         }
 
-        $workspace = $this->em->getRepository(Workspace::class)->findOneBy([]);
-        if (!$workspace) {
-            return $this->json(['error' => 'No workspace found. Upload a CV first to create default workspace.'], 400);
-        }
+        $workspace = $this->em->getRepository(Workspace::class)->findOneBy([])
+            ?? $this->createDefaultWorkspace();
 
         $job = new JobPosition();
         $job->setWorkspace($workspace);
@@ -55,10 +54,13 @@ class JobController extends AbstractController
         $this->em->flush();
 
         return $this->json([
-            'message' => 'Job position created successfully.',
-            'id'      => $job->getId(),
-            'title'   => $job->getTitle(),
-            'status'  => $job->getStatus(),
+            'id'           => $job->getId(),
+            'title'        => $job->getTitle(),
+            'description'  => $job->getDescription(),
+            'requirements' => $job->getRequirements(),
+            'status'       => $job->getStatus(),
+            'candidates'   => $job->getCandidates()->count(),
+            'created_at'   => $job->getCreatedAt()->format('Y-m-d H:i:s'),
         ], 201);
     }
 
@@ -94,11 +96,25 @@ class JobController extends AbstractController
         if (isset($data['title']))        $job->setTitle($data['title']);
         if (isset($data['description']))  $job->setDescription($data['description']);
         if (isset($data['requirements'])) $job->setRequirements($data['requirements']);
-        if (isset($data['status']))       $job->setStatus($data['status']);
+        if (isset($data['status'])) {
+            $allowed = [JobPosition::STATUS_OPEN, JobPosition::STATUS_CLOSED, JobPosition::STATUS_DRAFT];
+            if (!in_array($data['status'], $allowed, true)) {
+                return $this->json(['error' => 'Invalid status. Allowed: ' . implode(', ', $allowed)], 400);
+            }
+            $job->setStatus($data['status']);
+        }
 
         $this->em->flush();
 
-        return $this->json(['message' => 'Job updated successfully.', 'id' => $job->getId()]);
+        return $this->json([
+            'id'           => $job->getId(),
+            'title'        => $job->getTitle(),
+            'description'  => $job->getDescription(),
+            'requirements' => $job->getRequirements(),
+            'status'       => $job->getStatus(),
+            'candidates'   => $job->getCandidates()->count(),
+            'created_at'   => $job->getCreatedAt()->format('Y-m-d H:i:s'),
+        ]);
     }
 
     #[Route('/{id}', name: 'delete', methods: ['DELETE'])]
@@ -113,5 +129,15 @@ class JobController extends AbstractController
         $this->em->flush();
 
         return $this->json(['message' => 'Job deleted successfully.']);
+    }
+
+    private function createDefaultWorkspace(): Workspace
+    {
+        $workspace = new Workspace();
+        $workspace->setName('Default Workspace');
+        $workspace->setSlug('default');
+        $this->em->persist($workspace);
+
+        return $workspace;
     }
 }
