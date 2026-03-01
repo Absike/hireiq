@@ -51,6 +51,9 @@ class Document
     #[ORM\Column(type: 'integer', nullable: true)]
     private ?int $fileSize = null;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $textContent = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -80,6 +83,8 @@ class Document
     public function setMimeType(?string $mimeType): self { $this->mimeType = $mimeType; return $this; }
     public function getFileSize(): ?int { return $this->fileSize; }
     public function setFileSize(?int $fileSize): self { $this->fileSize = $fileSize; return $this; }
+    public function getTextContent(): ?string { return $this->textContent; }
+    public function setTextContent(?string $textContent): self { $this->textContent = $textContent; return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getChunks(): Collection { return $this->chunks; }
 }

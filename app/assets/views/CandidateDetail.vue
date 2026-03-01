@@ -40,6 +40,10 @@ const education = computed(() => extractedData.value.education || [])
 const languages = computed(() => extractedData.value.languages || [])
 const yearsExperience = computed(() => extractedData.value.years_experience ?? null)
 const phone = computed(() => extractedData.value.phone || null)
+const achievements = computed(() => extractedData.value.achievements || [])
+const engineeringPractices = computed(() => extractedData.value.engineering_practices || [])
+const projectComplexity = computed(() => extractedData.value.project_complexity || null)
+const careerProgression = computed(() => extractedData.value.career_progression || null)
 
 const availableJobs = computed(() => jobsStore.jobs.filter(job => job.status !== 'closed'))
 
@@ -314,6 +318,40 @@ onUnmounted(() => {
               <ul class="space-y-1">
                 <li v-for="entry in education" :key="entry" class="text-slate-600">• {{ entry }}</li>
               </ul>
+            </div>
+
+            <div v-if="achievements.length > 0" class="mt-6 border-t border-slate-100 pt-4">
+              <p class="text-sm font-medium text-slate-700 mb-2 text-emerald-600">Key Achievements</p>
+              <ul class="space-y-2">
+                <li v-for="(achievement, idx) in achievements" :key="idx" class="text-sm text-slate-600 flex items-start gap-2">
+                  <span class="text-emerald-500">•</span>
+                  {{ achievement }}
+                </li>
+              </ul>
+            </div>
+
+            <div v-if="engineeringPractices.length > 0" class="mt-6 border-t border-slate-100 pt-4">
+              <p class="text-sm font-medium text-slate-700 mb-2">Engineering Practices</p>
+              <div class="flex flex-wrap gap-2">
+                <span
+                  v-for="practice in engineeringPractices"
+                  :key="practice"
+                  class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded text-xs border border-slate-200"
+                >
+                  {{ practice }}
+                </span>
+              </div>
+            </div>
+
+            <div v-if="projectComplexity || careerProgression" class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 border-t border-slate-100 pt-4">
+              <div v-if="projectComplexity">
+                <p class="text-sm font-medium text-slate-700 mb-1 text-indigo-600">Project Complexity</p>
+                <p class="text-sm text-slate-600 italic">{{ projectComplexity }}</p>
+              </div>
+              <div v-if="careerProgression">
+                <p class="text-sm font-medium text-slate-700 mb-1 text-cyan-600">Career Progression</p>
+                <p class="text-sm text-slate-600 italic">{{ careerProgression }}</p>
+              </div>
             </div>
           </Card>
         </div>

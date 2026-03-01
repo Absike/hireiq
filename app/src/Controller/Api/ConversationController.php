@@ -6,20 +6,21 @@ use App\Entity\Candidate;
 use App\Entity\Conversation;
 use App\Entity\Message;
 use App\Entity\Workspace;
+use App\Service\AiService;
+use App\Service\DocumentService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/api/conversations', name: 'api_conversations_')]
 class ConversationController extends AbstractController
 {
     public function __construct(
         private EntityManagerInterface $em,
-        private HttpClientInterface $httpClient,
-        private string $groqKey,
+        private AiService $aiService,
+        private DocumentService $documentService,
     ) {}
 
     #[Route('', name: 'create', methods: ['POST'])]
@@ -107,10 +108,21 @@ class ConversationController extends AbstractController
 
         // Get candidate CV for context
         $candidate = $conversation->getCandidate();
-        $cvText = $this->getCandidateCvText($candidate);
+        $cvText = $candidate ? $this->documentService->getCandidateCvText($candidate) : null;
 
-        // Generate AI response using Grok
-        $aiReply = $this->generateAiResponse($content, $cvText, $candidate?->getName());
+        if (!$cvText) {
+            $aiReply = sprintf(
+                "I don't have access to %s's CV document to answer your question. Please ensure the CV has been uploaded and processed.",
+                $candidate?->getName() ?? 'the candidate'
+            );
+        } else {
+            // Generate AI response using AiService
+            try {
+                $aiReply = $this->aiService->chatWithCv($cvText, $content);
+            } catch (\Exception $e) {
+                $aiReply = "I encountered an error while processing your question: " . $e->getMessage();
+            }
+        }
 
         $aiMessage = new Message();
         $aiMessage->setConversation($conversation);
@@ -132,74 +144,5 @@ class ConversationController extends AbstractController
                 'content' => $aiMessage->getContent(),
             ],
         ]);
-    }
-
-    private function getCandidateCvText(?Candidate $candidate): ?string
-    {
-        if (!$candidate) return null;
-
-        foreach ($candidate->getDocuments() as $document) {
-            if ($document->getType() === 'cv' && $document->getStatus() === 'ready') {
-                $filePath = $document->getS3Path();
-                if ($filePath && file_exists($filePath)) {
-                    try {
-                        $parser = new \Smalot\PdfParser\Parser();
-                        $pdf = $parser->parseFile($filePath);
-                        return $pdf->getText();
-                    } catch (\Exception $e) {
-                        return null;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private function generateAiResponse(string $question, ?string $cvText, ?string $candidateName): string
-    {
-        if (!$cvText) {
-            return sprintf(
-                "I don't have access to %s's CV document to answer your question. Please ensure the CV has been uploaded and processed.",
-                $candidateName ?? 'the candidate'
-            );
-        }
-
-        $systemPrompt = sprintf(
-            'You are an AI assistant that answers questions about a candidate\'s CV. Use only the information from the CV provided. Be concise and professional. If the information is not in the CV, say so clearly. CV Content: %s',
-            substr($cvText, 0, 8000)
-        );
-
-        try {
-            $response = $this->httpClient->request('POST', 'https://api.groq.com/openai/v1/chat/completions', [
-                'auth_bearer' => $this->groqKey,
-                'headers' => [
-                    'Content-Type' => 'application/json',
-                ],
-                'json' => [
-                    'model' => 'llama-3.1-8b-instant',
-                    'messages' => [
-                        ['role' => 'system', 'content' => $systemPrompt],
-                        ['role' => 'user', 'content' => $question],
-                    ],
-                    'temperature' => 0.7,
-                    'max_tokens' => 1024,
-                ],
-            ]);
-
-            $data = $response->toArray();
-            return $data['choices'][0]['message']['content'] ?? 'Failed to get response';
-        } catch (\Exception $e) {
-            $errorDetail = $e->getMessage();
-            // Try to get more details from the response
-            if (method_exists($e, 'getResponse') && $e->getResponse()) {
-                try {
-                    $errorDetail .= ' - ' . $e->getResponse()->getContent(false);
-                } catch (\Exception $e2) {}
-            }
-            return sprintf(
-                "I encountered an error while processing your question: %s",
-                $errorDetail
-            );
-        }
     }
 }

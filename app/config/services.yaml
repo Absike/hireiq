@@ -22,22 +22,3 @@ services:
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
 
-    App\Command\TestAiCommand:
-        arguments:
-            $groqKey: '%env(GROQ_API_KEY)%'
-
-    App\Message\ProcessDocumentHandler:
-        arguments:
-            $groqKey: '%env(GROQ_API_KEY)%'
-
-    App\Controller\Api\CandidateController:
-        arguments:
-            $groqKey: '%env(GROQ_API_KEY)%'
-
-    App\Controller\Api\AnalysisController:
-        arguments:
-            $groqKey: '%env(GROQ_API_KEY)%'
-
-    App\Controller\Api\ConversationController:
-        arguments:
-            $groqKey: '%env(GROQ_API_KEY)%'

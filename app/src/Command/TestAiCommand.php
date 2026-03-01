@@ -2,40 +2,32 @@
 
 namespace App\Command;
 
+use App\Service\AiService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-#[AsCommand(name: 'app:test-ai', description: 'Test Groq via OpenAI-compatible API')]
+#[AsCommand(name: 'app:test-ai', description: 'Test AI service integration')]
 class TestAiCommand extends Command
 {
     public function __construct(
-        private string $groqKey,
-        private HttpClientInterface $httpClient,
+        private AiService $aiService,
     ) {
         parent::__construct();
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $output->writeln('🤖 Testing Groq...');
+        $output->writeln('🤖 Testing AI Service...');
 
-        $response = $this->httpClient->request('POST', 'https://api.groq.com/openai/v1/chat/completions', [
-            'auth_bearer' => $this->groqKey,
-            'json' => [
-                'model' => 'llama-3.3-70b-versatile',
-                'messages' => [
-                    ['role' => 'user', 'content' => 'Say hello and confirm you are running on Groq. One sentence only.'],
-                ],
-            ],
-        ]);
-
-        $data = $response->toArray();
-        $content = $data['choices'][0]['message']['content'] ?? 'No response';
-
-        $output->writeln('✅ Response: ' . $content);
+        try {
+            $response = $this->aiService->generateSummary('This is a test CV text for a Senior PHP Developer with 10 years of experience in Symfony and Vue.js.');
+            $output->writeln('✅ Response: ' . $response);
+        } catch (\Throwable $e) {
+            $output->writeln('❌ Error: ' . $e->getMessage());
+            return Command::FAILURE;
+        }
 
         return Command::SUCCESS;
     }
